@@ -1,0 +1,17 @@
+id: dpdp-2023
+title: India DPDP Act 2023
+version: "2023"
+disclaimer: "Indicative mapping to KubeGuard checks only; not legal advice or a compliance determination."
+controls:
+  - id: "8.5"
+    title: Reasonable security safeguards to prevent personal data breach
+    mapsTo: ["KG-001", "KG-002", "KG-011"]
+    assessable: true
+  - id: "8.6"
+    title: Measures to prevent and detect data breaches
+    mapsTo: ["KG-013", "KG-017"]
+    assessable: true
+  - id: "8.7"
+    title: Limit access to personal data
+    mapsTo: ["KG-012", "KG-016"]
+    assessable: true

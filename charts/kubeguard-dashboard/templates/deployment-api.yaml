@@ -1,0 +1,123 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "kgd.fullname" . }}-api
+  labels:
+    {{- include "kgd.labels" . | nindent 4 }}
+    app.kubernetes.io/component: api
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.api.replicas }}
+  {{- end }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0      # zero-downtime
+      maxSurge: 1
+  selector:
+    matchLabels:
+      {{- include "kgd.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: api
+  template:
+    metadata:
+      labels:
+        {{- include "kgd.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: api
+    spec:
+      serviceAccountName: {{ include "kgd.serviceAccountName" . }}
+      automountServiceAccountToken: {{ .Values.live.enabled }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- with .Values.image.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: api
+          image: {{ include "kgd.apiImage" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - dashboard
+            - --addr=:8080
+            - --profile={{ .Values.profile }}
+            - --brand={{ .Values.brand }}
+            - --async-workers={{ .Values.asyncWorkers }}
+            {{- range .Values.clusters }}
+            - --cluster={{ .id }}={{ .path }}
+            {{- end }}
+            {{- if .Values.assumeBreach }}
+            - --assume-breach
+            {{- end }}
+            {{- if .Values.schedule }}
+            - --schedule={{ .Values.schedule }}
+            {{- end }}
+            {{- if and .Values.postgres.enabled .Values.postgres.retention }}
+            - --retention={{ .Values.postgres.retention }}
+            {{- end }}
+            {{- if .Values.auth.oidc.enabled }}
+            - --oidc-issuer={{ .Values.auth.oidc.issuer }}
+            - --oidc-audience={{ .Values.auth.oidc.audience }}
+            - --oidc-jwks-url={{ .Values.auth.oidc.jwksUrl }}
+            - --oidc-tenant-claim={{ .Values.auth.oidc.tenantClaim }}
+            - --oidc-role-claim={{ .Values.auth.oidc.roleClaim }}
+            {{- end }}
+            {{- if gt (.Values.security.rateLimitPerSecond | int) 0 }}
+            - --rate-limit={{ .Values.security.rateLimitPerSecond }}
+            - --rate-burst={{ .Values.security.rateBurst }}
+            {{- end }}
+            {{- range .Values.security.allowedOrigins }}
+            - --allowed-origin={{ . }}
+            {{- end }}
+            {{- if .Values.tls.enabled }}
+            - --tls-cert=/tls/tls.crt
+            - --tls-key=/tls/tls.key
+            {{- end }}
+            {{- if .Values.otel.endpoint }}
+            - --otel-endpoint={{ .Values.otel.endpoint }}
+            {{- end }}
+          {{- if or .Values.auth.adminToken.value .Values.auth.adminToken.existingSecret .Values.postgres.enabled }}
+          env:
+            {{- if or .Values.auth.adminToken.value .Values.auth.adminToken.existingSecret }}
+            - name: KUBEGUARD_ADMIN_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.auth.adminToken.existingSecret | default (include "kgd.secretName" .) }}
+                  key: KUBEGUARD_ADMIN_TOKEN
+            {{- end }}
+            {{- if .Values.postgres.enabled }}
+            - name: KUBEGUARD_POSTGRES_DSN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.postgres.dsn.existingSecret | default (include "kgd.secretName" .) }}
+                  key: KUBEGUARD_POSTGRES_DSN
+            {{- end }}
+          {{- end }}
+          ports:
+            - name: http
+              containerPort: 8080
+          livenessProbe:
+            httpGet: { path: /healthz, port: http, scheme: {{ if .Values.tls.enabled }}HTTPS{{ else }}HTTP{{ end }} }
+            initialDelaySeconds: 5
+          readinessProbe:
+            httpGet: { path: /readyz, port: http, scheme: {{ if .Values.tls.enabled }}HTTPS{{ else }}HTTP{{ end }} }
+            initialDelaySeconds: 3
+          resources:
+            {{- toYaml .Values.api.resources | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            {{- if .Values.tls.enabled }}
+            - name: tls
+              mountPath: /tls
+              readOnly: true
+            {{- end }}
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        {{- if .Values.tls.enabled }}
+        - name: tls
+          secret:
+            secretName: {{ .Values.tls.secretName }}
+        {{- end }}

@@ -1,0 +1,69 @@
+{{- if and .Values.backup.enabled .Values.postgres.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "kgd.fullname" . }}-pg-backup
+  labels:
+    {{- include "kgd.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backup
+spec:
+  schedule: {{ .Values.backup.schedule | quote }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        metadata:
+          labels:
+            {{- include "kgd.selectorLabels" . | nindent 12 }}
+            app.kubernetes.io/component: backup
+        spec:
+          restartPolicy: OnFailure
+          serviceAccountName: {{ include "kgd.serviceAccountName" . }}
+          securityContext:
+            {{- toYaml .Values.podSecurityContext | nindent 12 }}
+          containers:
+            - name: pg-backup
+              image: {{ .Values.backup.image | quote }}
+              imagePullPolicy: {{ .Values.image.pullPolicy }}
+              securityContext:
+                {{- toYaml .Values.securityContext | nindent 16 }}
+              env:
+                - name: KUBEGUARD_POSTGRES_DSN
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Values.postgres.dsn.existingSecret | default (include "kgd.secretName" .) }}
+                      key: KUBEGUARD_POSTGRES_DSN
+                - name: RETENTION_DAYS
+                  value: {{ .Values.backup.retentionDays | quote }}
+              command: ["/bin/sh", "-c"]
+              args:
+                - |
+                  set -euo pipefail
+                  ts="$(date -u +%Y%m%dT%H%M%SZ)"
+                  out="/backups/kubeguard-${ts}.sql.gz"
+                  echo "dumping to ${out}"
+                  pg_dump "${KUBEGUARD_POSTGRES_DSN}" | gzip > "${out}"
+                  echo "pruning dumps older than ${RETENTION_DAYS}d"
+                  find /backups -name 'kubeguard-*.sql.gz' -type f -mtime "+${RETENTION_DAYS}" -delete
+                  echo "backup complete"
+              resources:
+                {{- toYaml .Values.backup.resources | nindent 16 }}
+              volumeMounts:
+                - name: backups
+                  mountPath: /backups
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: tmp
+              emptyDir: {}
+            - name: backups
+              {{- if .Values.backup.storage.existingClaim }}
+              persistentVolumeClaim:
+                claimName: {{ .Values.backup.storage.existingClaim }}
+              {{- else }}
+              emptyDir: {}
+              {{- end }}
+{{- end }}

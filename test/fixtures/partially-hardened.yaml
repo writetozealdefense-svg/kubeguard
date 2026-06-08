@@ -1,0 +1,97 @@
+# KubeGuard golden fixture: PARTIALLY-HARDENED state of payments/checkout.
+#
+# Oracle (ARCHITECTURE.md §16.1): ~8 findings. The cluster-admin RBAC path is
+# GONE (tight, namespaced role only), but the container is STILL privileged, so
+# a CRITICAL host-access path (privileged -> escape -> node) remains.
+#
+# Remaining issues by design: KG-001 (privileged), KG-006 (root), KG-007
+# (allowPrivilegeEscalation), KG-009 (rw rootfs), KG-010 (no limits), KG-015
+# (token automount), KG-017 (no NetworkPolicy), KG-020 (no seccomp).
+#
+# Hardened vs vulnerable: no docker.sock/hostPath, no hostNetwork/hostPID, no
+# dangerous capabilities, RBAC scoped to configmaps in-namespace (no
+# secrets/pods/wildcard/cluster-admin), image pinned by tag, Service is ClusterIP.
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: payments-staging
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: checkout-sa
+  namespace: payments-staging
+---
+# Tight, namespaced role: read configmaps only. No secrets, no pods, no wildcard.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: checkout-config-reader
+  namespace: payments-staging
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: checkout-config-reader-binding
+  namespace: payments-staging
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: checkout-config-reader
+subjects:
+  - kind: ServiceAccount
+    name: checkout-sa
+    namespace: payments-staging
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: checkout
+  namespace: payments-staging
+  labels:
+    app: checkout
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: checkout
+  template:
+    metadata:
+      labels:
+        app: checkout
+    spec:
+      serviceAccountName: checkout-sa
+      containers:
+        - name: checkout
+          image: checkout:1.4.2      # pinned tag -> KG-019 clean
+          # No resources block -> KG-010 (still)
+          securityContext:
+            privileged: true          # KG-001 (critical) -- the remaining risk
+            runAsUser: 0              # KG-006 (root)
+            # allowPrivilegeEscalation unset -> KG-007
+            # readOnlyRootFilesystem unset -> KG-009
+            # seccompProfile unset -> KG-020
+            capabilities:
+              drop: ["ALL"]           # KG-008 clean
+          ports:
+            - containerPort: 8080
+---
+# ClusterIP, not internet-facing -> KG-018 clean.
+apiVersion: v1
+kind: Service
+metadata:
+  name: checkout-svc
+  namespace: payments-staging
+spec:
+  type: ClusterIP
+  selector:
+    app: checkout
+  ports:
+    - port: 80
+      targetPort: 8080
+# No NetworkPolicy in "payments-staging" -> KG-017 (still).

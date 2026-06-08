@@ -1,0 +1,42 @@
+{{- if and .Values.tls.enabled .Values.tls.certManager.enabled }}
+{{- $cm := .Values.tls.certManager -}}
+{{- if $cm.createSelfSignedIssuer }}
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: {{ include "kgd.fullname" . }}-selfsigned
+  labels:
+    {{- include "kgd.labels" . | nindent 4 }}
+spec:
+  selfSigned: {}
+---
+{{- end }}
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ include "kgd.fullname" . }}-tls
+  labels:
+    {{- include "kgd.labels" . | nindent 4 }}
+spec:
+  secretName: {{ required "tls.secretName is required when tls.certManager.enabled" .Values.tls.secretName }}
+  duration: {{ $cm.duration }}
+  renewBefore: {{ $cm.renewBefore }}
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  dnsNames:
+    {{- if $cm.dnsNames }}
+    {{- toYaml $cm.dnsNames | nindent 4 }}
+    {{- else }}
+    - {{ .Values.ingress.host | quote }}
+    {{- end }}
+  issuerRef:
+    {{- if $cm.createSelfSignedIssuer }}
+    name: {{ include "kgd.fullname" . }}-selfsigned
+    kind: Issuer
+    {{- else }}
+    name: {{ required "tls.certManager.issuerRef.name is required (or set createSelfSignedIssuer)" $cm.issuerRef.name }}
+    kind: {{ $cm.issuerRef.kind }}
+    {{- end }}
+    group: cert-manager.io
+{{- end }}

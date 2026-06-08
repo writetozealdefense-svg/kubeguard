@@ -1,0 +1,55 @@
+{
+  "title": "KubeGuard Dashboard",
+  "uid": "kubeguard-dashboard",
+  "schemaVersion": 39,
+  "tags": ["kubeguard", "security"],
+  "timezone": "browser",
+  "panels": [
+    {
+      "title": "API p95 latency by route",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(kubeguard_dashboard_http_request_duration_seconds_bucket[5m])) by (le, route))",
+          "legendFormat": "{{route}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" } }
+    },
+    {
+      "title": "Scans (success vs failure)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        { "expr": "sum(rate(kubeguard_dashboard_scans_total[5m])) by (result)", "legendFormat": "{{result}}" }
+      ]
+    },
+    {
+      "title": "Findings by severity",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "targets": [
+        { "expr": "sum(kubeguard_dashboard_findings) by (severity)", "legendFormat": "{{severity}}" }
+      ]
+    },
+    {
+      "title": "Compliance pass rate by framework",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "targets": [
+        { "expr": "kubeguard_dashboard_compliance_pass_rate", "legendFormat": "{{cluster}} / {{framework}}" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "percentunit", "max": 1, "min": 0 } }
+    },
+    {
+      "title": "Scan duration p95 (s)",
+      "type": "stat",
+      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 16 },
+      "targets": [
+        { "expr": "histogram_quantile(0.95, sum(rate(kubeguard_dashboard_scan_duration_seconds_bucket[10m])) by (le))" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" } }
+    }
+  ]
+}

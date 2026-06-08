@@ -1,0 +1,45 @@
+[
+  {
+    "id": "AP-001",
+    "title": "Node breakout via checkout",
+    "severity": "critical",
+    "entry": {
+      "kind": "Deployment",
+      "namespace": "payments-staging",
+      "name": "checkout"
+    },
+    "hops": [
+      {
+        "order": 1,
+        "from": "NetworkReachable",
+        "to": "ContainerEscape",
+        "enabledBy": "KG-001",
+        "technique": [
+          "T1611"
+        ],
+        "narrative": "Privileged container allows breakout from the pod."
+      },
+      {
+        "order": 2,
+        "from": "ContainerEscape",
+        "to": "NodeAccess",
+        "enabledBy": "KG-001",
+        "technique": [
+          "T1611"
+        ],
+        "narrative": "Breakout yields code execution on the node hosting \"checkout\"."
+      },
+      {
+        "order": 3,
+        "from": "NodeAccess",
+        "to": "LateralMovement",
+        "enabledBy": "KG-017",
+        "technique": [
+          "T1021"
+        ],
+        "narrative": "No default-deny NetworkPolicy in \"payments-staging\" enables lateral movement."
+      }
+    ],
+    "summary": "Entry Deployment/checkout. Chain: NetworkReachable -\u003e ContainerEscape -\u003e NodeAccess -\u003e LateralMovement. Techniques: T1611, T1021."
+  }
+]

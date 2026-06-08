@@ -1,0 +1,43 @@
+# Prometheus alerting rules for the KubeGuard dashboard (Squad P3).
+# Load via the Prometheus rule_files config, or a PrometheusRule CRD.
+groups:
+  - name: kubeguard-dashboard
+    rules:
+      # SLO: API p95 latency < 250ms over 5m.
+      - alert: DashboardHighLatency
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(kubeguard_dashboard_http_request_duration_seconds_bucket[5m])) by (le, route)
+          ) > 0.25
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: "Dashboard p95 latency high on {{ $labels.route }}"
+          description: "p95 > 250ms for 10m."
+
+      # Scans are failing.
+      - alert: DashboardScanFailures
+        expr: |
+          sum(rate(kubeguard_dashboard_scans_total{result="failure"}[15m])) > 0
+        for: 15m
+        labels: { severity: warning }
+        annotations:
+          summary: "Scans are failing"
+          description: "One or more clusters' scans have failed over 15m."
+
+      # Posture regression: a framework's pass rate dropped below 50%.
+      - alert: ComplianceRegression
+        expr: kubeguard_dashboard_compliance_pass_rate < 0.5
+        for: 30m
+        labels: { severity: info }
+        annotations:
+          summary: "Compliance pass rate low for {{ $labels.framework }} on {{ $labels.cluster }}"
+          description: "passed/assessed < 50% (indicative mapping)."
+
+      # Availability: the dashboard is down.
+      - alert: DashboardDown
+        expr: up{job="kubeguard-dashboard"} == 0
+        for: 5m
+        labels: { severity: critical }
+        annotations:
+          summary: "KubeGuard dashboard is down"

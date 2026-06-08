@@ -1,0 +1,132 @@
+# KubeGuard golden fixture: HARDENED state of payments/checkout.
+#
+# Oracle (ARCHITECTURE.md §16.1): 0 findings, 0 attack paths, 100% of assessed
+# controls passing. Every check below has its negative (clean) case.
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: payments-prod
+  labels:
+    # Pod Security Admission: restricted (KG host-access checks satisfied).
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: latest
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: checkout-sa
+  namespace: payments-prod
+automountServiceAccountToken: false   # KG-015 clean
+---
+# Scoped, namespaced, least-privilege role. No secrets/pods/wildcard.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: checkout-config-reader
+  namespace: payments-prod
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: checkout-config-reader-binding
+  namespace: payments-prod
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: checkout-config-reader
+subjects:
+  - kind: ServiceAccount
+    name: checkout-sa
+    namespace: payments-prod
+---
+# Default-deny ingress + egress, with DNS egress allowed -> KG-017 clean.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny
+  namespace: payments-prod
+spec:
+  podSelector: {}
+  policyTypes: ["Ingress", "Egress"]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns
+  namespace: payments-prod
+spec:
+  podSelector: {}
+  policyTypes: ["Egress"]
+  egress:
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: checkout
+  namespace: payments-prod
+  labels:
+    app: checkout
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: checkout
+  template:
+    metadata:
+      labels:
+        app: checkout
+    spec:
+      serviceAccountName: checkout-sa
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault       # KG-020 clean
+      containers:
+        - name: checkout
+          # Digest-pinned image -> KG-019 clean.
+          image: registry.example.com/checkout:1.4.2@sha256:5b1f1c0e0d3c2b4a6f8e9d0c1b2a3948576635241f0e9d8c7b6a5948372615f0
+          resources:               # KG-010 clean
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+          securityContext:
+            privileged: false        # KG-001 clean
+            runAsNonRoot: true       # KG-006 clean
+            runAsUser: 1000
+            allowPrivilegeEscalation: false  # KG-007 clean
+            readOnlyRootFilesystem: true     # KG-009 clean
+            capabilities:
+              drop: ["ALL"]          # KG-008 clean
+            seccompProfile:
+              type: RuntimeDefault
+          ports:
+            - containerPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: checkout-svc
+  namespace: payments-prod
+spec:
+  type: ClusterIP                    # KG-018 clean
+  selector:
+    app: checkout
+  ports:
+    - port: 80
+      targetPort: 8080

@@ -1,0 +1,75 @@
+[
+  {
+    "id": "AP-001",
+    "title": "Cluster-admin takeover via checkout",
+    "severity": "critical",
+    "entry": {
+      "kind": "Deployment",
+      "namespace": "payments",
+      "name": "checkout"
+    },
+    "hops": [
+      {
+        "order": 1,
+        "from": "InternetIngress",
+        "to": "NetworkReachable",
+        "enabledBy": "KG-018",
+        "technique": [
+          "T1190"
+        ],
+        "narrative": "Internet-facing Service \"checkout-lb\" exposes workload \"checkout\"."
+      },
+      {
+        "order": 2,
+        "from": "NetworkReachable",
+        "to": "ContainerEscape",
+        "enabledBy": "KG-001",
+        "technique": [
+          "T1611"
+        ],
+        "narrative": "Privileged container allows breakout from the pod."
+      },
+      {
+        "order": 3,
+        "from": "ContainerEscape",
+        "to": "NodeAccess",
+        "enabledBy": "KG-002",
+        "technique": [
+          "T1611"
+        ],
+        "narrative": "Breakout yields code execution on the node hosting \"checkout\"."
+      },
+      {
+        "order": 4,
+        "from": "NodeAccess",
+        "to": "ServiceAccountToken",
+        "enabledBy": "KG-015",
+        "technique": [
+          "T1552.001"
+        ],
+        "narrative": "ServiceAccount \"checkout-sa\" token is auto-mounted and harvestable."
+      },
+      {
+        "order": 5,
+        "from": "ServiceAccountToken",
+        "to": "ClusterAdmin",
+        "enabledBy": "KG-011",
+        "technique": [
+          "T1078"
+        ],
+        "narrative": "\"checkout-sa\" is bound to cluster-admin — full cluster control."
+      },
+      {
+        "order": 6,
+        "from": "ClusterAdmin",
+        "to": "LateralMovement",
+        "enabledBy": "KG-017",
+        "technique": [
+          "T1021"
+        ],
+        "narrative": "No default-deny NetworkPolicy in \"payments\" enables lateral movement."
+      }
+    ],
+    "summary": "Entry Deployment/checkout. Chain: InternetIngress -\u003e NetworkReachable -\u003e ContainerEscape -\u003e NodeAccess -\u003e ServiceAccountToken -\u003e ClusterAdmin -\u003e LateralMovement. Techniques: T1190, T1611, T1552.001, T1078, T1021."
+  }
+]

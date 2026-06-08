@@ -1,0 +1,21 @@
+id: nca-ecc-1
+title: Saudi NCA Essential Cybersecurity Controls (ECC-1)
+version: "2018"
+disclaimer: "Indicative mapping to KubeGuard checks only; not an NCA assessment or accreditation."
+controls:
+  - id: "2-2"
+    title: Identity and Access Management
+    mapsTo: ["KG-011", "KG-012", "KG-016"]
+    assessable: true
+  - id: "2-3"
+    title: Information System and Processing Facilities Protection
+    mapsTo: ["KG-001", "KG-002", "KG-008"]
+    assessable: true
+  - id: "2-5"
+    title: Networks Security Management
+    mapsTo: ["KG-003", "KG-017", "KG-018"]
+    assessable: true
+  - id: "2-15"
+    title: Data and Information Protection
+    mapsTo: ["KG-013", "KG-015"]
+    assessable: true

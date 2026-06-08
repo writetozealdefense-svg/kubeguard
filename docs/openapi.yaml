@@ -1,0 +1,380 @@
+openapi: 3.0.3
+info:
+  title: KubeGuard Dashboard API
+  version: 1.0.0
+  description: >
+    Backend-for-frontend for the KubeGuard dashboard. Multi-tenant, multi-cluster
+    Kubernetes posture: findings ("dents"), attack paths, and compliance breach,
+    tracked over time. Cluster access is read-only. Compliance figures always carry
+    their `assessed` denominator and an indicative-mapping disclaimer. Secret values
+    are never returned — evidence carries key names only.
+servers:
+  - url: /
+security:
+  - bearerAuth: []
+paths:
+  /healthz:
+    get:
+      operationId: health
+      security: []
+      responses:
+        "200": { description: ok }
+  /readyz:
+    get:
+      operationId: ready
+      security: []
+      responses:
+        "200": { description: ready }
+        "503": { description: not ready }
+  /v1/clusters:
+    get:
+      operationId: listClusters
+      summary: List clusters in the caller's tenant.
+      responses:
+        "200":
+          description: clusters
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ClusterList" }
+  /v1/scans:
+    get:
+      operationId: listScans
+      parameters:
+        - { name: cluster, in: query, schema: { type: string } }
+        - { name: limit, in: query, schema: { type: integer, default: 50 } }
+        - { name: offset, in: query, schema: { type: integer, default: 0 } }
+      responses:
+        "200":
+          description: scans
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ScanList" }
+    post:
+      operationId: triggerScan
+      summary: Trigger an on-demand scan (analyst+).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/TriggerScanRequest" }
+      responses:
+        "202":
+          description: accepted
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Scan" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /v1/findings:
+    get:
+      operationId: listFindings
+      summary: Server-side filtered/sorted/paginated findings.
+      parameters:
+        - { name: cluster, in: query, schema: { type: string } }
+        - { name: severity, in: query, schema: { type: string, description: "comma-separated: critical,high,medium,low,info" } }
+        - { name: category, in: query, schema: { type: string } }
+        - { name: framework, in: query, schema: { type: string } }
+        - { name: namespace, in: query, schema: { type: string } }
+        - { name: search, in: query, schema: { type: string } }
+        - { name: sort, in: query, schema: { type: string, default: "severity", description: "severity|id|category" } }
+        - { name: order, in: query, schema: { type: string, default: "desc", enum: [asc, desc] } }
+        - { name: limit, in: query, schema: { type: integer, default: 50 } }
+        - { name: offset, in: query, schema: { type: integer, default: 0 } }
+      responses:
+        "200":
+          description: findings page
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FindingPage" }
+  /v1/posture:
+    get:
+      operationId: getPosture
+      parameters:
+        - { name: cluster, in: query, schema: { type: string } }
+      responses:
+        "200":
+          description: posture + per-framework compliance
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PostureResponse" }
+  /v1/attack-paths:
+    get:
+      operationId: listAttackPaths
+      parameters:
+        - { name: cluster, in: query, schema: { type: string } }
+      responses:
+        "200":
+          description: attack paths
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AttackPathList" }
+  /v1/history:
+    get:
+      operationId: getHistory
+      parameters:
+        - { name: cluster, in: query, schema: { type: string } }
+      responses:
+        "200":
+          description: history snapshots (oldest first)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/HistoryList" }
+  /v1/audit:
+    get:
+      operationId: listAudit
+      summary: Append-only privileged-action audit log (admin only, tenant-scoped).
+      description: >
+        Returns the tenant's audit entries (allowed and denied privileged actions).
+        Requires the admin role; analyst/viewer receive 403.
+      responses:
+        "200":
+          description: audit entries
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AuditList" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /v1/report:
+    get:
+      operationId: getReport
+      summary: Export the latest report for a scope as SARIF, CSV, or PDF.
+      description: >
+        Exports the most recent scan for the given cluster (or the merged fleet view
+        when cluster is omitted). SARIF reuses the engine's validated 2.1.0 reporter;
+        CSV is findings metadata (never secret values); PDF is a co-branded engagement
+        report carrying the honest-metrics disclaimer.
+      parameters:
+        - { name: cluster, in: query, schema: { type: string }, description: "cluster id; omit for the merged fleet view" }
+        - name: format
+          in: query
+          schema: { type: string, enum: [sarif, csv, pdf], default: sarif }
+      responses:
+        "200":
+          description: report file (Content-Disposition: attachment)
+          content:
+            application/sarif+json:
+              schema: { type: string, format: binary }
+            text/csv:
+              schema: { type: string, format: binary }
+            application/pdf:
+              schema: { type: string, format: binary }
+        "400": { $ref: "#/components/responses/Error" }
+        "404":
+          description: no scan for this scope yet
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  /v1/stream:
+    get:
+      operationId: stream
+      summary: Server-Sent Events — scan progress and posture updates.
+      responses:
+        "200":
+          description: text/event-stream of StreamEvent
+          content:
+            text/event-stream:
+              schema: { $ref: "#/components/schemas/StreamEvent" }
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT }
+  responses:
+    Forbidden:
+      description: insufficient role
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Error:
+      description: bad request
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string }
+    AuditEntry:
+      type: object
+      required: [at, subject, tenant, action, result]
+      properties:
+        at: { type: string, description: "RFC3339 timestamp" }
+        subject: { type: string, description: "actor; \"scheduler\" for cron runs" }
+        tenant: { type: string }
+        action: { type: string, description: "e.g. scan.trigger, audit.read" }
+        resource: { type: string }
+        result: { type: string, enum: [allowed, denied] }
+    AuditList:
+      type: object
+      required: [entries]
+      properties:
+        entries: { type: array, items: { $ref: "#/components/schemas/AuditEntry" } }
+    Severity:
+      type: string
+      enum: [critical, high, medium, low, info]
+    Cluster:
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        environment: { type: string }
+        lastScanAt: { type: string }
+        totalFindings: { type: integer }
+        overallPassRate: { type: number }
+    ClusterList:
+      type: object
+      required: [clusters]
+      properties:
+        clusters: { type: array, items: { $ref: "#/components/schemas/Cluster" } }
+    Scan:
+      type: object
+      required: [id, clusterId, status]
+      properties:
+        id: { type: string }
+        clusterId: { type: string }
+        status: { type: string, enum: [queued, running, succeeded, failed] }
+        startedAt: { type: string }
+        finishedAt: { type: string }
+        totalFindings: { type: integer }
+    ScanList:
+      type: object
+      required: [scans, total]
+      properties:
+        scans: { type: array, items: { $ref: "#/components/schemas/Scan" } }
+        total: { type: integer }
+    TriggerScanRequest:
+      type: object
+      required: [clusterId]
+      properties:
+        clusterId: { type: string }
+    ResourceRef:
+      type: object
+      required: [kind, name]
+      properties:
+        kind: { type: string }
+        namespace: { type: string }
+        name: { type: string }
+    ControlRef:
+      type: object
+      required: [framework, id]
+      properties:
+        framework: { type: string }
+        id: { type: string }
+        title: { type: string }
+    Evidence:
+      type: object
+      required: [path]
+      properties:
+        path: { type: string }
+        value: { type: string, description: "redacted where sensitive — key name only" }
+    Remediation:
+      type: object
+      required: [summary]
+      properties:
+        summary: { type: string }
+        snippet: { type: string }
+    Finding:
+      type: object
+      required: [id, title, severity, category, resource, remediation]
+      properties:
+        id: { type: string }
+        title: { type: string }
+        severity: { $ref: "#/components/schemas/Severity" }
+        category: { type: string }
+        resource: { $ref: "#/components/schemas/ResourceRef" }
+        evidence: { type: array, items: { $ref: "#/components/schemas/Evidence" } }
+        remediation: { $ref: "#/components/schemas/Remediation" }
+        grants: { type: array, items: { type: string } }
+        refs: { type: array, items: { $ref: "#/components/schemas/ControlRef" } }
+    FindingPage:
+      type: object
+      required: [findings, total, limit, offset]
+      properties:
+        findings: { type: array, items: { $ref: "#/components/schemas/Finding" } }
+        total: { type: integer }
+        limit: { type: integer }
+        offset: { type: integer }
+    PostureSummary:
+      type: object
+      required: [totalFindings, bySeverity, criticalPaths, controlsAssessed, controlsBreached, overallPassRate]
+      properties:
+        totalFindings: { type: integer }
+        bySeverity: { type: object, additionalProperties: { type: integer } }
+        criticalPaths: { type: integer }
+        controlsAssessed: { type: integer }
+        controlsBreached: { type: integer }
+        overallPassRate: { type: number }
+    ControlBreach:
+      type: object
+      required: [controlId, findings]
+      properties:
+        controlId: { type: string }
+        title: { type: string }
+        findings: { type: array, items: { type: string } }
+    FrameworkResult:
+      type: object
+      required: [framework, assessed, breached, passed, passRate, disclaimer]
+      properties:
+        framework: { type: string }
+        version: { type: string }
+        assessed: { type: integer }
+        breached: { type: integer }
+        passed: { type: integer }
+        passRate: { type: number }
+        breaches: { type: array, items: { $ref: "#/components/schemas/ControlBreach" } }
+        disclaimer: { type: string }
+    PostureResponse:
+      type: object
+      required: [posture, compliance]
+      properties:
+        posture: { $ref: "#/components/schemas/PostureSummary" }
+        compliance: { type: array, items: { $ref: "#/components/schemas/FrameworkResult" } }
+    PathHop:
+      type: object
+      required: [order, from, to, enabledBy, technique, narrative]
+      properties:
+        order: { type: integer }
+        from: { type: string }
+        to: { type: string }
+        enabledBy: { type: string }
+        technique: { type: array, items: { type: string } }
+        narrative: { type: string }
+    AttackPath:
+      type: object
+      required: [id, title, severity, entry, hops, summary]
+      properties:
+        id: { type: string }
+        title: { type: string }
+        severity: { $ref: "#/components/schemas/Severity" }
+        entry: { $ref: "#/components/schemas/ResourceRef" }
+        hops: { type: array, items: { $ref: "#/components/schemas/PathHop" } }
+        summary: { type: string }
+    AttackPathList:
+      type: object
+      required: [paths]
+      properties:
+        paths: { type: array, items: { $ref: "#/components/schemas/AttackPath" } }
+    HistorySnapshot:
+      type: object
+      required: [scanId, at, totalFindings, controlsAssessed, controlsBreached, overallPassRate, bySeverity]
+      properties:
+        scanId: { type: string }
+        at: { type: string }
+        totalFindings: { type: integer }
+        controlsAssessed: { type: integer }
+        controlsBreached: { type: integer }
+        overallPassRate: { type: number }
+        bySeverity: { type: object, additionalProperties: { type: integer } }
+    HistoryList:
+      type: object
+      required: [snapshots]
+      properties:
+        snapshots: { type: array, items: { $ref: "#/components/schemas/HistorySnapshot" } }
+    StreamEvent:
+      type: object
+      required: [type]
+      properties:
+        type: { type: string, enum: [scan_started, scan_progress, scan_completed, posture_updated] }
+        clusterId: { type: string }
+        scanId: { type: string }
+        progress: { type: number }
+        message: { type: string }

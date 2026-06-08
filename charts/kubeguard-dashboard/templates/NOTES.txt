@@ -1,0 +1,18 @@
+KubeGuard dashboard {{ .Chart.AppVersion }} installed as {{ include "kgd.fullname" . }}.
+
+Storage:  {{ if .Values.postgres.enabled }}Postgres (persistent){{ else }}in-memory (ephemeral){{ end }}
+Auth:     {{ if .Values.auth.oidc.enabled }}OIDC + {{ end }}local-admin
+API:      {{ .Values.api.replicas }} replica(s){{ if .Values.autoscaling.enabled }} (HPA {{ .Values.autoscaling.minReplicas }}–{{ .Values.autoscaling.maxReplicas }}){{ end }}, async-workers={{ .Values.asyncWorkers }}
+
+Reach the dashboard:
+{{- if .Values.ingress.enabled }}
+  http{{ if .Values.ingress.tls }}s{{ end }}://{{ .Values.ingress.host }}/
+{{- else if .Values.web.enabled }}
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "kgd.fullname" . }}-web 8080:8080
+  open http://localhost:8080
+{{- else }}
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "kgd.fullname" . }}-api 8080:8080
+{{- end }}
+
+Air-gapped: pre-load the api/web images into the cluster registry and keep
+image.pullPolicy=IfNotPresent. See docs/admin-guide.md.

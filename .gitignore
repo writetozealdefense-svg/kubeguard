@@ -1,0 +1,34 @@
+# Build output
+/dist/
+/bin/
+# Root-anchored so these match the built binaries only — a bare `kubeguard`
+# pattern also matches the charts/kubeguard/ directory and silently un-tracks it.
+/kubeguard
+/kubeguard.exe
+/kubectl-kubeguard
+/kubectl-kubeguard.exe
+
+# Test / coverage artifacts
+*.out
+coverage.*
+
+# Local scan outputs and history stores
+*.sarif
+*.kgdb
+*.sqlite
+
+# Node / frontend
+node_modules/
+web/dist/
+web/playwright-report/
+web/test-results/
+
+# Nested mount of the sibling workspace folder (not part of this repo)
+/KubeGuard/
+
+# Editor / OS
+.idea/
+.vscode/
+.DS_Store
+*.exe~
+*.test

@@ -1,0 +1,29 @@
+id: nist-800-53
+title: NIST SP 800-53 Rev. 5
+version: "5.1.1"
+disclaimer: "Indicative mapping to KubeGuard checks only; not a NIST assessment or authorization."
+controls:
+  - id: "AC-6"
+    title: Least Privilege
+    mapsTo: ["KG-011", "KG-012", "KG-016"]
+    assessable: true
+  - id: "AC-4"
+    title: Information Flow Enforcement
+    mapsTo: ["KG-017", "KG-018"]
+    assessable: true
+  - id: "CM-7"
+    title: Least Functionality
+    mapsTo: ["KG-001", "KG-002", "KG-008"]
+    assessable: true
+  - id: "SC-7"
+    title: Boundary Protection
+    mapsTo: ["KG-003", "KG-018"]
+    assessable: true
+  - id: "IA-5"
+    title: Authenticator Management
+    mapsTo: ["KG-013", "KG-015"]
+    assessable: true
+  - id: "SC-39"
+    title: Process Isolation
+    mapsTo: ["KG-004", "KG-005"]
+    assessable: true

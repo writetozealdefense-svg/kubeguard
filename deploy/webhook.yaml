@@ -1,0 +1,128 @@
+# KubeGuard validating admission webhook (ARCHITECTURE.md §14).
+# TLS is provisioned by cert-manager; the CA bundle is injected into the
+# ValidatingWebhookConfiguration via the cert-manager.io/inject-ca-from annotation.
+# The webhook is read-only: it admits or denies pods and never mutates them.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kubeguard
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kubeguard-webhook
+  namespace: kubeguard
+---
+# Self-signed issuer + serving certificate (cert-manager).
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: kubeguard-selfsigned
+  namespace: kubeguard
+spec:
+  selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: kubeguard-webhook-cert
+  namespace: kubeguard
+spec:
+  secretName: kubeguard-webhook-tls
+  dnsNames:
+    - kubeguard-webhook.kubeguard.svc
+    - kubeguard-webhook.kubeguard.svc.cluster.local
+  issuerRef:
+    name: kubeguard-selfsigned
+    kind: Issuer
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kubeguard-webhook
+  namespace: kubeguard
+  labels:
+    app: kubeguard-webhook
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: kubeguard-webhook
+  template:
+    metadata:
+      labels:
+        app: kubeguard-webhook
+    spec:
+      serviceAccountName: kubeguard-webhook
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: webhook
+          image: ghcr.io/kubeguard/kubeguard:latest
+          args: ["webhook", "--port=9443", "--cert-dir=/certs"]
+          ports:
+            - containerPort: 9443
+              name: https
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "250m"
+              memory: "128Mi"
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: certs
+              mountPath: /certs
+              readOnly: true
+      volumes:
+        - name: certs
+          secret:
+            secretName: kubeguard-webhook-tls
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kubeguard-webhook
+  namespace: kubeguard
+spec:
+  selector:
+    app: kubeguard-webhook
+  ports:
+    - port: 443
+      targetPort: 9443
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: kubeguard-pod-policy
+  annotations:
+    cert-manager.io/inject-ca-from: kubeguard/kubeguard-webhook-cert
+webhooks:
+  - name: pods.kubeguard.io
+    admissionReviewVersions: ["v1"]
+    sideEffects: None
+    # fail-closed: deny if the webhook is unreachable. Set to Ignore for fail-open.
+    failurePolicy: Fail
+    namespaceSelector:
+      matchLabels:
+        kubeguard.io/enforce: "true"
+    rules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["CREATE"]
+        resources: ["pods"]
+        scope: Namespaced
+    clientConfig:
+      service:
+        name: kubeguard-webhook
+        namespace: kubeguard
+        path: /validate-pods
+        port: 443

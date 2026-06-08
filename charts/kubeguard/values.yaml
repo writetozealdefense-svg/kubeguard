@@ -1,0 +1,65 @@
+replicaCount: 1
+
+image:
+  repository: ghcr.io/kubeguard/kubeguard
+  tag: ""          # defaults to .Chart.AppVersion
+  digest: ""       # if set (sha256:...), pins by digest and overrides tag
+  pullPolicy: IfNotPresent
+
+nameOverride: ""
+fullnameOverride: ""
+
+# Scan configuration.
+profile: zeal-default        # cis | zeal-default
+assumeBreach: false
+# Live (read-only) cluster scan vs an in-pod manifest path.
+live: true
+inputPath: ""                # used when live=false
+schedule: "0 * * * *"        # cron; empty = scan once on boot only
+history: /data/kubeguard.sqlite
+
+service:
+  type: ClusterIP
+  port: 8080
+
+# Read-only RBAC for live scanning.
+rbac:
+  create: true
+
+serviceAccount:
+  create: true
+  name: ""
+  automount: true
+
+# Prometheus Operator ServiceMonitor.
+serviceMonitor:
+  enabled: false
+  interval: 60s
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 96Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
+
+podSecurityContext:
+  runAsNonRoot: true
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]
+
+persistence:
+  enabled: false
+  size: 1Gi
+  storageClass: ""
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

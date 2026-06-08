@@ -1,0 +1,18 @@
+apiVersion: v2
+name: kubeguard
+description: Kubernetes attack-surface, posture & compliance scanner (service mode).
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+home: https://github.com/kubeguard/kubeguard
+icon: https://raw.githubusercontent.com/kubeguard/kubeguard/main/docs/logo.png
+sources:
+  - https://github.com/kubeguard/kubeguard
+keywords:
+  - security
+  - kubernetes
+  - compliance
+  - posture
+  - attack-paths
+maintainers:
+  - name: KubeGuard

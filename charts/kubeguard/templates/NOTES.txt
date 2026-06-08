@@ -1,0 +1,18 @@
+KubeGuard is installed as a service.
+
+  Release:   {{ .Release.Name }}
+  Namespace: {{ .Release.Namespace }}
+  Mode:      {{ if .Values.live }}live (read-only cluster scan){{ else }}offline ({{ .Values.inputPath }}){{ end }}
+  Profile:   {{ .Values.profile }}
+  Schedule:  {{ default "scan once on boot" .Values.schedule }}
+
+Reach the API and dashboard:
+
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "kubeguard.fullname" . }} {{ .Values.service.port }}:{{ .Values.service.port }}
+
+  open http://localhost:{{ .Values.service.port }}/            # dashboard
+  curl  http://localhost:{{ .Values.service.port }}/v1/posture # posture JSON
+  curl  http://localhost:{{ .Values.service.port }}/metrics    # Prometheus
+
+Compliance numbers are reported as "breached of assessed" with an
+indicative-mapping disclaimer — never a bare compliant/non-compliant verdict.

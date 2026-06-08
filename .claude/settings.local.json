@@ -1,0 +1,31 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(go version *)",
+      "Bash(helm version *)",
+      "Bash(goreleaser --version)",
+      "Bash(golangci-lint --version)",
+      "Bash(cosign version *)",
+      "Bash(goreleaser check *)",
+      "Bash(helm lint *)",
+      "Bash(go build *)",
+      "Bash(echo \"BUILD_EXIT=$?\")",
+      "PowerShell(\"---CLI---\")",
+      "Bash(helm template *)",
+      "Bash(goreleaser build *)",
+      "Bash(go test *)",
+      "Bash(echo \"TEST_EXIT=$?\")",
+      "Bash(./dist/kubeguard_windows_amd64_v1/kubeguard.exe version *)",
+      "Bash(echo \"COVER_EXIT=$?\")",
+      "Bash(goreleaser release *)",
+      "Bash(go vet *)",
+      "Bash(echo \"build_exit=$?\")",
+      "Bash(echo \"vet_exit=$?\")",
+      "Bash(git check-ignore *)",
+      "Bash(git add *)",
+      "Bash(git reset *)",
+      "Bash(git commit --amend -m 'fix\\(packaging\\): track Helm chart + cmd entrypoints \\(gitignore was eating them\\)' -m 'The bare .gitignore patterns '\\\\''kubeguard'\\\\'' / '\\\\''kubectl-kubeguard'\\\\'' \\(meant for the built binaries\\) are slashless, so git matched them against any path component — silently un-tracking the charts/kubeguard/ chart AND the cmd/kubeguard/ and cmd/kubectl-kubeguard/ entrypoints. A fresh clone was missing both binary main packages and the entire Helm chart.' -m '- Anchor the binary ignores to repo root \\(/kubeguard, /kubectl-kubeguard, +.exe\\) so they no longer swallow same-named directories. *)",
+      "Bash(echo \"exit=$?\")"
+    ]
+  }
+}

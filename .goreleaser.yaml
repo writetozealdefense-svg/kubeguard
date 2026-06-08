@@ -1,0 +1,108 @@
+version: 2
+
+project_name: kubeguard
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: kubeguard
+    main: ./cmd/kubeguard
+    binary: kubeguard
+    env:
+      - CGO_ENABLED=0
+    goos: [linux, windows, darwin]
+    goarch: [amd64, arm64]
+    ignore:
+      - goos: windows
+        goarch: arm64
+      - goos: darwin
+        goarch: amd64
+    ldflags:
+      - -s -w
+      - -X github.com/kubeguard/kubeguard/internal/cli.version={{ .Version }}
+      - -X github.com/kubeguard/kubeguard/internal/cli.commit={{ .Commit }}
+      - -X github.com/kubeguard/kubeguard/internal/cli.date={{ .Date }}
+
+  - id: kubectl-kubeguard
+    main: ./cmd/kubectl-kubeguard
+    binary: kubectl-kubeguard
+    env:
+      - CGO_ENABLED=0
+    goos: [linux, windows, darwin]
+    goarch: [amd64, arm64]
+    ignore:
+      - goos: windows
+        goarch: arm64
+      - goos: darwin
+        goarch: amd64
+    ldflags:
+      - -s -w
+      - -X github.com/kubeguard/kubeguard/internal/cli.version={{ .Version }}
+      - -X github.com/kubeguard/kubeguard/internal/cli.commit={{ .Commit }}
+      - -X github.com/kubeguard/kubeguard/internal/cli.date={{ .Date }}
+
+archives:
+  - id: default
+    ids: [kubeguard, kubectl-kubeguard]
+    name_template: >-
+      {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+
+checksum:
+  name_template: "checksums.txt"
+
+# CycloneDX SBOM per archive (generated with syft).
+sboms:
+  - id: archive
+    artifacts: archive
+    documents:
+      - "${artifact}.cyclonedx.json"
+    cmd: syft
+    args:
+      - "$artifact"
+      - "--output"
+      - "cyclonedx-json=$document"
+
+# Keyless cosign signing (uses the CI OIDC identity — no keys, Fulcio + Rekor).
+signs:
+  # Sign the checksums file: its signature transitively covers every archive.
+  - id: checksum
+    cmd: cosign
+    signature: "${artifact}.sig"
+    certificate: "${artifact}.pem"
+    args:
+      - "sign-blob"
+      - "--yes"
+      - "--output-signature=${signature}"
+      - "--output-certificate=${certificate}"
+      - "${artifact}"
+    artifacts: checksum
+    output: true
+  # Also sign each archive/binary artifact directly, plus SBOM documents.
+  - id: artifacts
+    cmd: cosign
+    signature: "${artifact}.sig"
+    certificate: "${artifact}.pem"
+    args:
+      - "sign-blob"
+      - "--yes"
+      - "--output-signature=${signature}"
+      - "--output-certificate=${certificate}"
+      - "${artifact}"
+    artifacts: all
+    output: true
+
+# SLSA build provenance (https://goreleaser.com/customization/provenance/).
+# The release workflow additionally runs the SLSA generator for SLSA L3.
+release:
+  github:
+    owner: kubeguard
+    name: kubeguard
+  prerelease: auto
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-snapshot-{{ .ShortCommit }}"

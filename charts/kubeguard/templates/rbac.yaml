@@ -1,0 +1,39 @@
+{{- if and .Values.rbac.create .Values.live -}}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "kubeguard.fullname" . }}-readonly
+  labels:
+    {{- include "kubeguard.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: ["namespaces", "serviceaccounts", "pods", "services"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "statefulsets", "daemonsets"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["batch"]
+    resources: ["jobs", "cronjobs"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["roles", "clusterroles", "rolebindings", "clusterrolebindings"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["networkpolicies"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "kubeguard.fullname" . }}-readonly
+  labels:
+    {{- include "kubeguard.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "kubeguard.fullname" . }}-readonly
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "kubeguard.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
+{{- end }}

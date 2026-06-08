@@ -1,0 +1,314 @@
+[
+  {
+    "framework": "CIS Kubernetes Benchmark",
+    "version": "1.9",
+    "assessed": 9,
+    "breached": 8,
+    "passed": 1,
+    "passRate": 0.1111,
+    "breaches": [
+      {
+        "controlId": "5.1.1",
+        "title": "Ensure cluster-admin is used only where required",
+        "findings": [
+          "KG-011"
+        ]
+      },
+      {
+        "controlId": "5.1.3",
+        "title": "Minimize wildcard use in Roles and ClusterRoles",
+        "findings": [
+          "KG-012"
+        ]
+      },
+      {
+        "controlId": "5.1.6",
+        "title": "Ensure SA tokens are only mounted where necessary",
+        "findings": [
+          "KG-015"
+        ]
+      },
+      {
+        "controlId": "5.2.1",
+        "title": "Minimize admission of privileged containers",
+        "findings": [
+          "KG-001"
+        ]
+      },
+      {
+        "controlId": "5.2.4",
+        "title": "Minimize admission of containers wishing to share the host network",
+        "findings": [
+          "KG-003",
+          "KG-004"
+        ]
+      },
+      {
+        "controlId": "5.2.8",
+        "title": "Minimize admission of containers with added capabilities",
+        "findings": [
+          "KG-008"
+        ]
+      },
+      {
+        "controlId": "5.3.2",
+        "title": "Ensure all namespaces have network policies defined",
+        "findings": [
+          "KG-017"
+        ]
+      },
+      {
+        "controlId": "5.7.3",
+        "title": "Apply security context to pods and containers",
+        "findings": [
+          "KG-006",
+          "KG-007",
+          "KG-009",
+          "KG-020"
+        ]
+      }
+    ],
+    "disclaimer": "Indicative mapping to KubeGuard checks only; not a CIS certification or audit."
+  },
+  {
+    "framework": "India DPDP Act 2023",
+    "version": "2023",
+    "assessed": 3,
+    "breached": 3,
+    "passed": 0,
+    "passRate": 0,
+    "breaches": [
+      {
+        "controlId": "8.5",
+        "title": "Reasonable security safeguards to prevent personal data breach",
+        "findings": [
+          "KG-001",
+          "KG-002",
+          "KG-011"
+        ]
+      },
+      {
+        "controlId": "8.6",
+        "title": "Measures to prevent and detect data breaches",
+        "findings": [
+          "KG-013",
+          "KG-017"
+        ]
+      },
+      {
+        "controlId": "8.7",
+        "title": "Limit access to personal data",
+        "findings": [
+          "KG-012"
+        ]
+      }
+    ],
+    "disclaimer": "Indicative mapping to KubeGuard checks only; not legal advice or a compliance determination."
+  },
+  {
+    "framework": "ISO/IEC 27001:2022 Annex A",
+    "version": "2022",
+    "assessed": 5,
+    "breached": 5,
+    "passed": 0,
+    "passRate": 0,
+    "breaches": [
+      {
+        "controlId": "A.8.2",
+        "title": "Privileged access rights",
+        "findings": [
+          "KG-011"
+        ]
+      },
+      {
+        "controlId": "A.8.9",
+        "title": "Configuration management",
+        "findings": [
+          "KG-001",
+          "KG-009",
+          "KG-020"
+        ]
+      },
+      {
+        "controlId": "A.8.20",
+        "title": "Networks security",
+        "findings": [
+          "KG-003",
+          "KG-017"
+        ]
+      },
+      {
+        "controlId": "A.8.22",
+        "title": "Segregation of networks",
+        "findings": [
+          "KG-018"
+        ]
+      },
+      {
+        "controlId": "A.8.3",
+        "title": "Information access restriction",
+        "findings": [
+          "KG-012",
+          "KG-013"
+        ]
+      }
+    ],
+    "disclaimer": "Indicative mapping to KubeGuard checks only; not an ISO certification or audit."
+  },
+  {
+    "framework": "Saudi NCA Essential Cybersecurity Controls (ECC-1)",
+    "version": "2018",
+    "assessed": 4,
+    "breached": 4,
+    "passed": 0,
+    "passRate": 0,
+    "breaches": [
+      {
+        "controlId": "2-2",
+        "title": "Identity and Access Management",
+        "findings": [
+          "KG-011",
+          "KG-012"
+        ]
+      },
+      {
+        "controlId": "2-3",
+        "title": "Information System and Processing Facilities Protection",
+        "findings": [
+          "KG-001",
+          "KG-002",
+          "KG-008"
+        ]
+      },
+      {
+        "controlId": "2-5",
+        "title": "Networks Security Management",
+        "findings": [
+          "KG-003",
+          "KG-017",
+          "KG-018"
+        ]
+      },
+      {
+        "controlId": "2-15",
+        "title": "Data and Information Protection",
+        "findings": [
+          "KG-013",
+          "KG-015"
+        ]
+      }
+    ],
+    "disclaimer": "Indicative mapping to KubeGuard checks only; not an NCA assessment or accreditation."
+  },
+  {
+    "framework": "NIST SP 800-53 Rev. 5",
+    "version": "5.1.1",
+    "assessed": 6,
+    "breached": 6,
+    "passed": 0,
+    "passRate": 0,
+    "breaches": [
+      {
+        "controlId": "AC-6",
+        "title": "Least Privilege",
+        "findings": [
+          "KG-011",
+          "KG-012"
+        ]
+      },
+      {
+        "controlId": "AC-4",
+        "title": "Information Flow Enforcement",
+        "findings": [
+          "KG-017",
+          "KG-018"
+        ]
+      },
+      {
+        "controlId": "CM-7",
+        "title": "Least Functionality",
+        "findings": [
+          "KG-001",
+          "KG-002",
+          "KG-008"
+        ]
+      },
+      {
+        "controlId": "SC-7",
+        "title": "Boundary Protection",
+        "findings": [
+          "KG-003",
+          "KG-018"
+        ]
+      },
+      {
+        "controlId": "IA-5",
+        "title": "Authenticator Management",
+        "findings": [
+          "KG-013",
+          "KG-015"
+        ]
+      },
+      {
+        "controlId": "SC-39",
+        "title": "Process Isolation",
+        "findings": [
+          "KG-004"
+        ]
+      }
+    ],
+    "disclaimer": "Indicative mapping to KubeGuard checks only; not a NIST assessment or authorization."
+  },
+  {
+    "framework": "PCI DSS v4.0",
+    "version": "4.0",
+    "assessed": 5,
+    "breached": 5,
+    "passed": 0,
+    "passRate": 0,
+    "breaches": [
+      {
+        "controlId": "1.3.1",
+        "title": "Inbound traffic to the CDE is restricted",
+        "findings": [
+          "KG-017",
+          "KG-018"
+        ]
+      },
+      {
+        "controlId": "2.2.1",
+        "title": "Configuration standards are applied to system components",
+        "findings": [
+          "KG-001",
+          "KG-002",
+          "KG-009",
+          "KG-020"
+        ]
+      },
+      {
+        "controlId": "6.4.1",
+        "title": "Public-facing web applications are protected against attacks",
+        "findings": [
+          "KG-018"
+        ]
+      },
+      {
+        "controlId": "7.2.1",
+        "title": "Access is assigned based on least privilege",
+        "findings": [
+          "KG-011",
+          "KG-012"
+        ]
+      },
+      {
+        "controlId": "8.3.1",
+        "title": "Strong authentication for access to system components",
+        "findings": [
+          "KG-013",
+          "KG-015"
+        ]
+      }
+    ],
+    "disclaimer": "Indicative mapping to KubeGuard checks only; not a PCI DSS assessment by a QSA."
+  }
+]

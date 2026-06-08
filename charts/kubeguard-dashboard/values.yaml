@@ -1,0 +1,144 @@
+# Default values for kubeguard-dashboard.
+
+nameOverride: ""
+fullnameOverride: ""
+
+image:
+  # api/worker share the same binary+image.
+  api:
+    repository: ghcr.io/kubeguard/kubeguard
+    tag: ""          # defaults to .Chart.appVersion
+    digest: ""       # set to pin by digest (recommended)
+  web:
+    repository: ghcr.io/kubeguard/kubeguard-web
+    tag: ""
+    digest: ""
+  pullPolicy: IfNotPresent   # air-gapped: keep IfNotPresent with pre-loaded images
+  pullSecrets: []
+
+# Clusters to scan: each is id=<manifest-path|mounted source>. For live mode set
+# live.enabled and mount a kubeconfig / use workload identity.
+clusters:
+  - id: prod
+    path: /manifests/prod
+
+profile: zeal-default
+brand: KubeGuard           # co-brand on PDF exports
+schedule: ""               # cron, e.g. "0 * * * *"
+assumeBreach: false
+
+# Auth: local-admin token (air-gapped) and/or OIDC (default off).
+auth:
+  # Provide the admin token via an existing secret, or set value to generate one.
+  adminToken:
+    value: ""              # if set, stored in a chart-managed Secret
+    existingSecret: ""     # name of a Secret with key KUBEGUARD_ADMIN_TOKEN
+  oidc:
+    enabled: false
+    issuer: ""
+    audience: ""
+    jwksUrl: ""
+    tenantClaim: tenant
+    roleClaim: role
+
+# Postgres persistence (default off → in-memory). DSN via secret.
+postgres:
+  enabled: false
+  dsn:
+    value: ""              # if set, stored in a chart-managed Secret
+    existingSecret: ""     # name of a Secret with key KUBEGUARD_POSTGRES_DSN
+  retention: ""            # e.g. 720h
+
+# Postgres logical backup CronJob (pg_dump → in-pod; redirect to object storage
+# or a managed PITR in production). Requires postgres.enabled.
+backup:
+  enabled: false
+  schedule: "0 2 * * *"    # daily 02:00
+  image: postgres:16-alpine
+  retentionDays: 7         # keep N days of dumps in the backup volume
+  # Where dumps land. emptyDir is ephemeral (smoke only); use an existingClaim
+  # (RWX PVC) or wire an upload sidecar/command to object storage in prod.
+  storage:
+    existingClaim: ""      # PVC name; empty → emptyDir (non-durable)
+    size: 10Gi
+  resources:
+    requests: { cpu: 50m, memory: 64Mi }
+    limits: { cpu: 250m, memory: 256Mi }
+
+# TLS termination at the pod (otherwise terminate at the ingress).
+tls:
+  enabled: false
+  secretName: ""           # secret with tls.crt / tls.key
+  # Optional cert-manager integration: issue tls.secretName automatically
+  # instead of mounting a manually-created Secret.
+  certManager:
+    enabled: false
+    # Reference an existing Issuer/ClusterIssuer, or let the chart create a
+    # self-signed Issuer (acceptable only for internal/air-gapped trust).
+    issuerRef:
+      name: ""
+      kind: ClusterIssuer  # Issuer | ClusterIssuer
+    createSelfSignedIssuer: false
+    dnsNames: []           # defaults to [ingress.host] when empty
+    duration: 2160h        # 90d
+    renewBefore: 360h      # 15d
+
+security:
+  rateLimitPerSecond: 0    # 0 = unlimited
+  rateBurst: 20
+  allowedOrigins: []       # CSRF origin allowlist
+
+# Async scan workers in the API pod (0 = synchronous).
+asyncWorkers: 2
+
+# Observability
+otel:
+  endpoint: ""             # OTLP/HTTP endpoint; empty = tracing off
+serviceMonitor:
+  enabled: false
+  interval: 30s
+
+# Read-only cluster RBAC (live mode).
+live:
+  enabled: false
+
+api:
+  replicas: 2
+  resources:
+    requests: { cpu: 50m, memory: 64Mi }
+    limits: { cpu: 500m, memory: 256Mi }
+
+web:
+  enabled: true
+  replicas: 2
+  resources:
+    requests: { cpu: 10m, memory: 32Mi }
+    limits: { cpu: 200m, memory: 128Mi }
+
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 6
+  targetCPUUtilizationPercentage: 70
+
+# HA: PodDisruptionBudget.
+pdb:
+  enabled: true
+  minAvailable: 1
+
+ingress:
+  enabled: false
+  className: ""
+  host: kubeguard.example.com
+  annotations: {}
+  tls: []
+
+# Hardened pod/container security context (applied to all workloads).
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 65532
+  seccompProfile: { type: RuntimeDefault }
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities: { drop: ["ALL"] }

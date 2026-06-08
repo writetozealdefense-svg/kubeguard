@@ -1,0 +1,79 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "kubeguard.fullname" . }}
+  labels:
+    {{- include "kubeguard.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "kubeguard.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "kubeguard.selectorLabels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "kubeguard.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: kubeguard
+          image: {{ include "kubeguard.image" . | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - serve
+            - --addr=:{{ .Values.service.port }}
+            - --profile={{ .Values.profile }}
+            {{- if .Values.assumeBreach }}
+            - --assume-breach
+            {{- end }}
+            {{- if .Values.live }}
+            - --live
+            {{- else }}
+            - --input={{ required "inputPath is required when live=false" .Values.inputPath }}
+            {{- end }}
+            {{- if .Values.schedule }}
+            - {{ printf "--schedule=%s" .Values.schedule | quote }}
+            {{- end }}
+            {{- if .Values.history }}
+            - --history={{ .Values.history }}
+            {{- end }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.port }}
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          volumeMounts:
+            - name: data
+              mountPath: /data
+      volumes:
+        - name: data
+          {{- if .Values.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "kubeguard.fullname" . }}
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

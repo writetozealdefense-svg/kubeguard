@@ -1,0 +1,188 @@
+package cli
+
+import (
+	"fmt"
+	"io"
+	"os"
+	"time"
+
+	"github.com/kubeguard/kubeguard/internal/analyzer"
+	"github.com/kubeguard/kubeguard/internal/history"
+	"github.com/kubeguard/kubeguard/internal/loader/live"
+	"github.com/kubeguard/kubeguard/internal/loader/offline"
+	"github.com/kubeguard/kubeguard/internal/model"
+	"github.com/kubeguard/kubeguard/internal/report"
+	"github.com/kubeguard/kubeguard/pkg/api"
+	"github.com/spf13/cobra"
+)
+
+type scanParams struct {
+	input        string
+	format       string
+	profileName  string
+	output       string
+	assumeBreach bool
+	failOn       string
+	historyPath  string
+	watch        bool
+	live         bool
+	kubeContext  string
+}
+
+func newScanCmd() *cobra.Command {
+	var p scanParams
+	cmd := &cobra.Command{
+		Use:   "scan",
+		Short: "Scan Kubernetes manifests for misconfigurations and attack paths",
+		Long:  "Load Kubernetes resources from a path and report findings, attack paths, and compliance posture.",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			if p.watch {
+				if p.live {
+					return fmt.Errorf("--watch is not supported with --live")
+				}
+				return watchLoop(cmd, p)
+			}
+			return runScan(cmd, p)
+		},
+	}
+	f := cmd.Flags()
+	f.StringVarP(&p.input, "input", "i", "", "path to a manifest file, directory, or snapshot (required)")
+	f.StringVarP(&p.format, "format", "f", "console", "output format: console|json|sarif|html")
+	f.StringVarP(&p.profileName, "profile", "p", "zeal-default", "check profile: cis|zeal-default")
+	f.StringVarP(&p.output, "output", "o", "", "write output to a file instead of stdout")
+	f.BoolVar(&p.assumeBreach, "assume-breach", false, "seed every workload as reachable from an in-cluster foothold")
+	f.StringVar(&p.failOn, "fail-on", "", "exit non-zero if any finding is at or above this severity: critical|high|medium|low")
+	f.StringVar(&p.historyPath, "history", "", "append this scan to a history store (.sqlite/.db/.kgdb → SQLite, else JSONL)")
+	f.BoolVar(&p.watch, "watch", false, "re-scan when the input changes")
+	f.BoolVar(&p.live, "live", false, "scan a live cluster read-only via kubeconfig instead of files")
+	f.StringVar(&p.kubeContext, "context", "", "kubeconfig context to use with --live")
+	return cmd
+}
+
+// loadResources ingests from a live cluster (read-only) or from files, and
+// returns the resources plus a source label for the report.
+func loadResources(cmd *cobra.Command, p scanParams) ([]model.Resource, string, error) {
+	if p.live {
+		cs, err := live.NewClientset(p.kubeContext)
+		if err != nil {
+			return nil, "", err
+		}
+		resources, err := live.Load(cmd.Context(), cs)
+		if err != nil {
+			return nil, "", fmt.Errorf("live scan: %w", err)
+		}
+		src := "live cluster"
+		if p.kubeContext != "" {
+			src = "live cluster (" + p.kubeContext + ")"
+		}
+		return resources, src, nil
+	}
+	if p.input == "" {
+		return nil, "", fmt.Errorf("either --input/-i or --live is required")
+	}
+	resources, err := offline.Load(p.input)
+	if err != nil {
+		return nil, "", fmt.Errorf("load %q: %w", p.input, err)
+	}
+	return resources, p.input, nil
+}
+
+func runScan(cmd *cobra.Command, p scanParams) error {
+	resources, source, err := loadResources(cmd, p)
+	if err != nil {
+		return err
+	}
+	rep, err := analyzer.Analyze(resources, p.profileName, p.assumeBreach)
+	if err != nil {
+		return err
+	}
+	rep.GeneratedAt = time.Now().UTC().Format(time.RFC3339)
+	rep.Source = source
+	findings := rep.Findings
+
+	var hist []history.Record
+	if p.historyPath != "" {
+		store, err := history.Open(p.historyPath)
+		if err != nil {
+			return fmt.Errorf("open history: %w", err)
+		}
+		defer func() { _ = store.Close() }()
+		if err := store.Append(history.FromReport(rep)); err != nil {
+			return err
+		}
+		if hist, err = store.All(); err != nil {
+			return err
+		}
+	}
+
+	out := cmd.OutOrStdout()
+	color := false
+	if p.output != "" {
+		fh, err := os.Create(p.output) //nolint:gosec // operator-specified output path
+		if err != nil {
+			return fmt.Errorf("create %q: %w", p.output, err)
+		}
+		defer func() { _ = fh.Close() }()
+		out = fh
+	} else if f, ok := out.(*os.File); ok {
+		color = (p.format == "console" || p.format == "") && os.Getenv("NO_COLOR") == "" && isTerminal(f)
+	}
+
+	if err := render(out, p.format, rep, hist, color); err != nil {
+		return err
+	}
+
+	if p.failOn != "" {
+		thr, err := parseSeverity(p.failOn)
+		if err != nil {
+			return err
+		}
+		if n := countAtOrAbove(findings, thr); n > 0 {
+			return gateBreach(thr, n)
+		}
+	}
+	return nil
+}
+
+func render(out io.Writer, format string, rep api.Report, hist []history.Record, color bool) error {
+	switch format {
+	case "json":
+		return report.JSON(out, rep)
+	case "sarif":
+		return report.SARIF(out, rep)
+	case "html":
+		return report.HTML(out, rep, hist)
+	case "console", "":
+		return report.Console(out, rep, color)
+	default:
+		return fmt.Errorf("unknown format %q (want console|json|sarif|html)", format)
+	}
+}
+
+// watchLoop re-runs the scan whenever the input's modification time advances,
+// until the command context is cancelled. A gate breach is reported but does
+// not stop watching; a real error does.
+func watchLoop(cmd *cobra.Command, p scanParams) error {
+	ctx := cmd.Context()
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
+	var last time.Time
+	for {
+		if fi, err := os.Stat(p.input); err == nil && fi.ModTime().After(last) {
+			last = fi.ModTime()
+			if err := runScan(cmd, p); err != nil {
+				var ce *codedError
+				if !isCodedError(err, &ce) {
+					return err
+				}
+				_, _ = fmt.Fprintln(cmd.ErrOrStderr(), ce.msg)
+			}
+		}
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-ticker.C:
+		}
+	}
+}

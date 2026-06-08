@@ -1,0 +1,25 @@
+id: iso-27001-2022
+title: ISO/IEC 27001:2022 Annex A
+version: "2022"
+disclaimer: "Indicative mapping to KubeGuard checks only; not an ISO certification or audit."
+controls:
+  - id: "A.8.2"
+    title: Privileged access rights
+    mapsTo: ["KG-011", "KG-016"]
+    assessable: true
+  - id: "A.8.9"
+    title: Configuration management
+    mapsTo: ["KG-001", "KG-009", "KG-020"]
+    assessable: true
+  - id: "A.8.20"
+    title: Networks security
+    mapsTo: ["KG-003", "KG-017"]
+    assessable: true
+  - id: "A.8.22"
+    title: Segregation of networks
+    mapsTo: ["KG-018"]
+    assessable: true
+  - id: "A.8.3"
+    title: Information access restriction
+    mapsTo: ["KG-012", "KG-013"]
+    assessable: true
