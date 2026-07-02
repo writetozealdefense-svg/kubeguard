@@ -4,9 +4,12 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/kubeguard/kubeguard/internal/analyzer"
+	"github.com/kubeguard/kubeguard/internal/checks"
+	"github.com/kubeguard/kubeguard/internal/compliance"
 	"github.com/kubeguard/kubeguard/internal/history"
 	"github.com/kubeguard/kubeguard/internal/loader/live"
 	"github.com/kubeguard/kubeguard/internal/loader/offline"
@@ -48,7 +51,7 @@ func newScanCmd() *cobra.Command {
 	}
 	f := cmd.Flags()
 	f.StringVarP(&p.input, "input", "i", "", "path to a manifest file, directory, or snapshot (required)")
-	f.StringVarP(&p.format, "format", "f", "console", "output format: console|json|sarif|html")
+	f.StringVarP(&p.format, "format", "f", "console", "output format: console|json|sarif|asff|html|evidence")
 	f.StringVarP(&p.profileName, "profile", "p", "zeal-default", "check profile: cis|zeal-default")
 	f.StringVarP(&p.output, "output", "o", "", "write output to a file instead of stdout")
 	f.BoolVar(&p.assumeBreach, "assume-breach", false, "seed every workload as reachable from an in-cluster foothold")
@@ -116,21 +119,27 @@ func runScan(cmd *cobra.Command, p scanParams) error {
 		}
 	}
 
-	out := cmd.OutOrStdout()
-	color := false
-	if p.output != "" {
-		fh, err := os.Create(p.output) //nolint:gosec // operator-specified output path
-		if err != nil {
-			return fmt.Errorf("create %q: %w", p.output, err)
+	if p.format == "evidence" {
+		if err := exportEvidence(cmd, p, rep); err != nil {
+			return err
 		}
-		defer func() { _ = fh.Close() }()
-		out = fh
-	} else if f, ok := out.(*os.File); ok {
-		color = (p.format == "console" || p.format == "") && os.Getenv("NO_COLOR") == "" && isTerminal(f)
-	}
+	} else {
+		out := cmd.OutOrStdout()
+		color := false
+		if p.output != "" {
+			fh, err := os.Create(p.output) //nolint:gosec // operator-specified output path
+			if err != nil {
+				return fmt.Errorf("create %q: %w", p.output, err)
+			}
+			defer func() { _ = fh.Close() }()
+			out = fh
+		} else if f, ok := out.(*os.File); ok {
+			color = (p.format == "console" || p.format == "") && os.Getenv("NO_COLOR") == "" && isTerminal(f)
+		}
 
-	if err := render(out, p.format, rep, hist, color); err != nil {
-		return err
+		if err := render(out, p.format, rep, hist, color); err != nil {
+			return err
+		}
 	}
 
 	if p.failOn != "" {
@@ -151,13 +160,64 @@ func render(out io.Writer, format string, rep api.Report, hist []history.Record,
 		return report.JSON(out, rep)
 	case "sarif":
 		return report.SARIF(out, rep)
+	case "asff":
+		return report.ASFF(out, rep)
 	case "html":
 		return report.HTML(out, rep, hist)
 	case "console", "":
 		return report.Console(out, rep, color)
 	default:
-		return fmt.Errorf("unknown format %q (want console|json|sarif|html)", format)
+		return fmt.Errorf("unknown format %q (want console|json|sarif|asff|html|evidence)", format)
 	}
+}
+
+// exportEvidence writes one self-contained, offline HTML evidence pack per
+// framework plus a machine-readable JSON sibling into the -o directory. Output
+// is deterministic: filenames derive from the pack id and the single
+// rep.GeneratedAt is the only wall-clock timestamp.
+func exportEvidence(cmd *cobra.Command, p scanParams, rep api.Report) error {
+	if p.output == "" {
+		return fmt.Errorf("-f evidence requires -o <dir> (a directory to write evidence packs into)")
+	}
+	packs, err := compliance.LoadEmbedded()
+	if err != nil {
+		return fmt.Errorf("load packs: %w", err)
+	}
+	prof, err := checks.ProfileByName(p.profileName)
+	if err != nil {
+		return err
+	}
+	evs := compliance.BuildEvidence(rep, packs, prof.RunnableIDs())
+
+	if err := os.MkdirAll(p.output, 0o750); err != nil {
+		return fmt.Errorf("create %q: %w", p.output, err)
+	}
+	for _, ev := range evs {
+		if err := writeEvidenceFile(filepath.Join(p.output, ev.ID+".evidence.html"), func(w io.Writer) error {
+			return report.EvidenceHTML(w, ev)
+		}); err != nil {
+			return err
+		}
+		if err := writeEvidenceFile(filepath.Join(p.output, ev.ID+".evidence.json"), func(w io.Writer) error {
+			return report.EvidenceJSON(w, ev)
+		}); err != nil {
+			return err
+		}
+	}
+	_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "wrote %d evidence packs (HTML + JSON) to %s\n", len(evs), p.output)
+	return nil
+}
+
+func writeEvidenceFile(path string, render func(io.Writer) error) error {
+	fh, err := os.Create(path) //nolint:gosec // operator-specified output directory
+	if err != nil {
+		return fmt.Errorf("create %q: %w", path, err)
+	}
+	defer func() { _ = fh.Close() }()
+	if err := render(fh); err != nil {
+		return err
+	}
+	return nil
 }
 
 // watchLoop re-runs the scan whenever the input's modification time advances,

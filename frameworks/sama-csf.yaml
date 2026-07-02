@@ -1,0 +1,31 @@
+id: sama-csf
+title: SAMA Cyber Security Framework (Saudi Central Bank)
+version: "1.0"
+disclaimer: "Indicative mapping to KubeGuard checks only; not a SAMA assessment or certification. Control identifiers follow the SAMA CSF domain structure and map at the domain level."
+controls:
+  - id: "3.3.5"
+    title: Identity and Access Management
+    mapsTo: ["KG-011", "KG-012", "KG-013", "KG-014", "KG-015", "KG-016"]
+    assessable: true
+  - id: "3.3.6"
+    title: Application Security
+    mapsTo: ["KG-006", "KG-007", "KG-009", "KG-019", "KG-020"]
+    assessable: true
+  - id: "3.3.8"
+    title: Infrastructure Security
+    mapsTo: ["KG-001", "KG-002", "KG-004", "KG-005", "KG-008"]
+    assessable: true
+  - id: "3.3.9"
+    title: Network Security
+    mapsTo: ["KG-003", "KG-017", "KG-018"]
+    assessable: true
+  # Governance/process domains have no declarative Kubernetes signal; declared
+  # non-assessable so they never inflate or deflate the honest denominator.
+  - id: "3.3.16"
+    title: Cyber Security Event Management
+    mapsTo: []
+    assessable: false
+  - id: "3.3.17"
+    title: Cyber Security Reviews
+    mapsTo: []
+    assessable: false

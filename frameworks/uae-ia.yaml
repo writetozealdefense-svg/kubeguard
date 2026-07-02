@@ -1,0 +1,26 @@
+id: uae-ia
+title: UAE Information Assurance Standards (NESA)
+version: "1.1"
+disclaimer: "Indicative mapping to KubeGuard checks only; not a NESA / UAE IA assessment or certification. Controls map at the technical-control-family level."
+controls:
+  - id: "T1"
+    title: Access Control
+    mapsTo: ["KG-011", "KG-012", "KG-013", "KG-014", "KG-015", "KG-016"]
+    assessable: true
+  - id: "T4"
+    title: Systems Security and Hardening
+    mapsTo: ["KG-001", "KG-002", "KG-004", "KG-005", "KG-006", "KG-007", "KG-008", "KG-009", "KG-020"]
+    assessable: true
+  - id: "T5"
+    title: Network Security
+    mapsTo: ["KG-003", "KG-017", "KG-018"]
+    assessable: true
+  - id: "T7"
+    title: Third-Party / Supply Chain Security
+    mapsTo: ["KG-019"]
+    assessable: true
+  # Management-family controls (M-series) are organizational; non-assessable here.
+  - id: "M1"
+    title: Risk Management
+    mapsTo: []
+    assessable: false

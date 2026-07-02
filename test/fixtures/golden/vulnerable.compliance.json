@@ -71,6 +71,50 @@
     "disclaimer": "Indicative mapping to KubeGuard checks only; not a CIS certification or audit."
   },
   {
+    "framework": "NCSC Cyber Essentials",
+    "version": "3.1",
+    "assessed": 3,
+    "breached": 3,
+    "passed": 0,
+    "passRate": 0,
+    "breaches": [
+      {
+        "controlId": "firewalls",
+        "title": "Firewalls (boundary and network protection)",
+        "findings": [
+          "KG-003",
+          "KG-017",
+          "KG-018"
+        ]
+      },
+      {
+        "controlId": "secure-configuration",
+        "title": "Secure configuration",
+        "findings": [
+          "KG-001",
+          "KG-002",
+          "KG-006",
+          "KG-007",
+          "KG-008",
+          "KG-009",
+          "KG-020"
+        ]
+      },
+      {
+        "controlId": "user-access-control",
+        "title": "User access control",
+        "findings": [
+          "KG-011",
+          "KG-012",
+          "KG-013",
+          "KG-014",
+          "KG-015"
+        ]
+      }
+    ],
+    "disclaimer": "Indicative mapping to KubeGuard checks only; not an IASME/NCSC Cyber Essentials certification."
+  },
+  {
     "framework": "India DPDP Act 2023",
     "version": "2023",
     "assessed": 3,
@@ -201,6 +245,60 @@
     "disclaimer": "Indicative mapping to KubeGuard checks only; not an NCA assessment or accreditation."
   },
   {
+    "framework": "NCSC Cyber Assessment Framework (CAF) 4.0",
+    "version": "4.0",
+    "assessed": 4,
+    "breached": 4,
+    "passed": 0,
+    "passRate": 0,
+    "breaches": [
+      {
+        "controlId": "B2",
+        "title": "Identity and Access Control",
+        "findings": [
+          "KG-011",
+          "KG-012",
+          "KG-013",
+          "KG-014",
+          "KG-015"
+        ]
+      },
+      {
+        "controlId": "B3",
+        "title": "Data Security",
+        "findings": [
+          "KG-013",
+          "KG-015"
+        ]
+      },
+      {
+        "controlId": "B4",
+        "title": "System Security",
+        "findings": [
+          "KG-001",
+          "KG-002",
+          "KG-003",
+          "KG-004",
+          "KG-006",
+          "KG-007",
+          "KG-008",
+          "KG-009",
+          "KG-020"
+        ]
+      },
+      {
+        "controlId": "B5",
+        "title": "Resilient Networks and Systems",
+        "findings": [
+          "KG-010",
+          "KG-017",
+          "KG-018"
+        ]
+      }
+    ],
+    "disclaimer": "Indicative mapping to KubeGuard checks only; not an NCSC assessment or certification."
+  },
+  {
     "framework": "NIST SP 800-53 Rev. 5",
     "version": "5.1.1",
     "assessed": 6,
@@ -310,5 +408,140 @@
       }
     ],
     "disclaimer": "Indicative mapping to KubeGuard checks only; not a PCI DSS assessment by a QSA."
+  },
+  {
+    "framework": "SAMA Cyber Security Framework (Saudi Central Bank)",
+    "version": "1.0",
+    "assessed": 4,
+    "breached": 4,
+    "passed": 0,
+    "passRate": 0,
+    "breaches": [
+      {
+        "controlId": "3.3.5",
+        "title": "Identity and Access Management",
+        "findings": [
+          "KG-011",
+          "KG-012",
+          "KG-013",
+          "KG-014",
+          "KG-015"
+        ]
+      },
+      {
+        "controlId": "3.3.6",
+        "title": "Application Security",
+        "findings": [
+          "KG-006",
+          "KG-007",
+          "KG-009",
+          "KG-019",
+          "KG-020"
+        ]
+      },
+      {
+        "controlId": "3.3.8",
+        "title": "Infrastructure Security",
+        "findings": [
+          "KG-001",
+          "KG-002",
+          "KG-004",
+          "KG-008"
+        ]
+      },
+      {
+        "controlId": "3.3.9",
+        "title": "Network Security",
+        "findings": [
+          "KG-003",
+          "KG-017",
+          "KG-018"
+        ]
+      }
+    ],
+    "disclaimer": "Indicative mapping to KubeGuard checks only; not a SAMA assessment or certification. Control identifiers follow the SAMA CSF domain structure and map at the domain level."
+  },
+  {
+    "framework": "UAE Information Assurance Standards (NESA)",
+    "version": "1.1",
+    "assessed": 4,
+    "breached": 4,
+    "passed": 0,
+    "passRate": 0,
+    "breaches": [
+      {
+        "controlId": "T1",
+        "title": "Access Control",
+        "findings": [
+          "KG-011",
+          "KG-012",
+          "KG-013",
+          "KG-014",
+          "KG-015"
+        ]
+      },
+      {
+        "controlId": "T4",
+        "title": "Systems Security and Hardening",
+        "findings": [
+          "KG-001",
+          "KG-002",
+          "KG-004",
+          "KG-006",
+          "KG-007",
+          "KG-008",
+          "KG-009",
+          "KG-020"
+        ]
+      },
+      {
+        "controlId": "T5",
+        "title": "Network Security",
+        "findings": [
+          "KG-003",
+          "KG-017",
+          "KG-018"
+        ]
+      },
+      {
+        "controlId": "T7",
+        "title": "Third-Party / Supply Chain Security",
+        "findings": [
+          "KG-019"
+        ]
+      }
+    ],
+    "disclaimer": "Indicative mapping to KubeGuard checks only; not a NESA / UAE IA assessment or certification. Controls map at the technical-control-family level."
+  },
+  {
+    "framework": "UK GDPR / Data Protection Act 2018",
+    "version": "2018",
+    "assessed": 2,
+    "breached": 2,
+    "passed": 0,
+    "passRate": 0,
+    "breaches": [
+      {
+        "controlId": "Art.5(1)(f)",
+        "title": "Integrity and confidentiality of personal data",
+        "findings": [
+          "KG-011",
+          "KG-013",
+          "KG-015",
+          "KG-017"
+        ]
+      },
+      {
+        "controlId": "Art.32",
+        "title": "Security of processing — appropriate technical measures",
+        "findings": [
+          "KG-011",
+          "KG-013",
+          "KG-017",
+          "KG-018"
+        ]
+      }
+    ],
+    "disclaimer": "Indicative mapping to KubeGuard checks only; not an ICO assessment or a determination of compliance."
   }
 ]
