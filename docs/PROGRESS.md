@@ -4,6 +4,38 @@ Tracked squad-by-squad per ARCHITECTURE.md §18. A squad is "done" only when
 `go build ./... && go vet ./... && golangci-lint run && go test ./...` are all
 clean and the squad's acceptance gate passes against the fixtures.
 
+## KSPM extension — Phase 0 baseline verification (2026-07-02, branch `road-to-100`)
+
+First compile + gate run on a real Go 1.26 toolchain (the original authoring env
+had none). Results:
+
+- **Toolchain:** go1.26.4, node v24.14.1, docker 29.0.1 — all present.
+- **`go build ./...`** clean. **`go vet ./...`** clean.
+- **`golangci-lint run`** — surfaced 2 revive issues in `internal/report/asff.go`
+  (from the prior aws+mea commit): `BuildASFF` returned an unexported type, and
+  `asffTruncate` shadowed the builtin `max`. Fixed (exported `ASFFFinding`,
+  renamed param to `maxLen`); lint now **0 issues**.
+- **`go test ./... -cover`** — all packages pass. Engine packages meet the ≥80%
+  floor: analyzer 90.9, attack 87.1, checks 88.4, compliance 96.1, graph 96.8,
+  harden 85.3, history 80.0, loader/live 90.7, loader/offline 88.2, report 83.4,
+  server 90.4, webhook 82.1, dashboard 83.8. (`-race` unavailable on this host —
+  no cgo/gcc; CI runs it on Linux. cli 46.2 and pg 0.0 are command-glue / skipped
+  without a DSN, not engine packages.)
+- **Golden acceptance:** `scan vulnerable.yaml` → 19 findings (4 critical) + 1
+  CRITICAL cluster-admin chain (matches the oracle). `scan hardened.yaml` → 0
+  findings. `--fail-on high` on vulnerable → exit 2. `harden -o … && scan` the
+  bundle → 0 findings.
+- **Web gate:** `npm ci`, `npm run build`, `npm test` (47 passed / 12 files),
+  `npm run lint` (0 warnings) — all clean.
+- **Full stack (`docker compose`):** api + postgres + web all healthy —
+  `/healthz`, `/readyz`, `/metrics` (Prometheus gauges), the web UI, and the
+  nginx→API proxy all return 200. Fixed a web-image crash-loop: the hardened
+  nginx-unprivileged image couldn't envsubst a root-owned baked `conf.d`; now
+  shipped as a template written at runtime by the non-root user. (Local host
+  ports remapped in `.env` to avoid collisions with other running stacks.)
+
+**Verdict:** baseline green. Proceeding into the KSPM workstreams (K1–K10).
+
 | Squad | Status | Notes |
 |---|---|---|
 | A — Scaffold | ✅ done | module, §13 layout, cobra + `version`, slog, `.golangci.yml`, CI matrix, 3 golden fixtures |
@@ -87,8 +119,9 @@ host-access chain to NodeAccess with no cluster-admin; hardened → 0. Golden-as
 ## Squad E — Compliance engine
 
 **Shipped**
-- `frameworks/*.yaml`: 6 data-driven packs — CIS Kubernetes Benchmark, NIST 800-53 r5,
-  PCI DSS v4.0, ISO 27001:2022, India DPDP 2023, Saudi NCA ECC-1 — embedded via
+- `frameworks/*.yaml`: 9 data-driven packs — CIS Kubernetes Benchmark, NIST 800-53 r5,
+  PCI DSS v4.0, ISO 27001:2022, India DPDP 2023, Saudi NCA ECC-1, NCSC CAF 4.0,
+  NCSC Cyber Essentials, UK GDPR / DPA 2018 — embedded via
   `frameworks/embed.go` (`go:embed`), so the binary is self-contained (ARCHITECTURE.md §9.1).
 - `internal/compliance`: strict pack loader (`UnmarshalStrict` → rejects unknown keys /
   malformed packs) + validation; posture math with honest denominators (a control is assessed
@@ -99,8 +132,17 @@ host-access chain to NodeAccess with no cluster-admin; hardened → 0. Golden-as
 - `internal/cli` + `report`: scan emits per-framework `breached of assessed` + disclaimer.
 
 **Acceptance** — vulnerable → breached controls per framework (golden
-`vulnerable.compliance.json`); hardened → 100% of assessed across all 6; malformed packs
+`vulnerable.compliance.json`); hardened → 100% of assessed across all 9; malformed packs
 rejected; adding a pack = a YAML drop-in (no code change). Coverage 94.9%.
+
+**UK packs (additive)** — `ncsc-caf-4.yaml` (NCSC CAF 4.0; C1/C2 detection
+`assessable:false`), `cyber-essentials.yaml` (NCSC Cyber Essentials; security-update-
+management + malware-protection `assessable:false` — not derivable from static
+manifests, so excluded from the denominator), and `uk-gdpr-dpa-2018.yaml`
+(UK GDPR Art.5(1)(f) / Art.32). Tests assert every `mapsTo` resolves to a real
+check id and that `assessable:false` controls stay out of the denominator. Golden
+`vulnerable.compliance.json` was intentionally regenerated to include the three
+frameworks (now 9); pack-count assertions updated in compliance/analyzer/server tests.
 
 ## Squad F — Reporters + history
 
@@ -108,6 +150,14 @@ rejected; adding a pack = a YAML drop-in (no code change). Coverage 94.9%.
 - `internal/report`: console (TTY colour, `NO_COLOR`-aware), JSON, SARIF 2.1.0
   (`go-sarif`, one rule per fired check), and a self-contained offline HTML dashboard
   (Overview/Compliance/Attack-Paths/Findings tabs, SVG pass-rate trend, clickable path nodes).
+- **Evidence packs** (`-f evidence -o <dir>`): `compliance.BuildEvidence` +
+  `report.EvidenceHTML`/`EvidenceJSON` write one self-contained offline HTML file
+  plus a JSON sibling per framework, listing each assessed control, its mapped
+  checks, and the breaching findings (resource ref, redacted evidence, ATT&CK
+  techniques, remediation) with `breached/passed/assessed`, pass rate, and the
+  disclaimer. Reuses `pkg/api` types (`EvidencePack`/`EvidenceControl` compose
+  `Finding`). Deterministic — single `generatedAt`. Golden-asserted against
+  `vulnerable.evidence.json` / `hardened.evidence.json` (new fixtures).
 - `internal/history`: `Store` interface with file (JSONL) and SQLite (`modernc.org/sqlite`,
   no cgo) backends; `FromReport` summary; drift via `--history`.
 - `internal/cli`: `scan -f console|json|sarif|html`, `--fail-on` (exit 2 via coded error),
