@@ -8,14 +8,24 @@
 /kubectl-kubeguard
 /kubectl-kubeguard.exe
 
-# Test / coverage artifacts
+# Test / coverage artifacts. Note: match report artifacts by extension, NOT
+# `coverage.*` — that also swallows Go source files named coverage.go (e.g.
+# internal/graph/coverage.go), silently un-tracking them.
 *.out
-coverage.*
+coverage.html
+coverage.txt
+coverage.xml
+coverage.cov
 
 # Local scan outputs and history stores
 *.sarif
 *.kgdb
 *.sqlite
+
+# Generated demo output (regenerated live during the demo)
+/demo/evidence/
+/demo/evidence-hardened/
+/demo/report.*
 
 # Node / frontend
 node_modules/
