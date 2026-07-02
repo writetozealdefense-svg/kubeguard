@@ -1,0 +1,42 @@
+# A cluster-wide "observability" node agent shipped as a privileged DaemonSet
+# with a full host-root mount — a classic over-permissioned agent that hands an
+# attacker the node.
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: node-agent
+  namespace: thamespay-payments
+  labels:
+    app: node-agent
+spec:
+  selector:
+    matchLabels:
+      app: node-agent
+  template:
+    metadata:
+      labels:
+        app: node-agent
+    spec:
+      hostNetwork: true        # KG-003
+      hostPID: true            # KG-004
+      volumes:
+        - name: host-root      # KG-002 (sensitive hostPath: entire host fs)
+          hostPath:
+            path: /
+            type: Directory
+      containers:
+        - name: agent
+          image: node-agent:latest   # KG-019 (mutable tag)
+          # No resources block -> KG-010
+          securityContext:
+            privileged: true        # KG-001
+            runAsUser: 0            # KG-006
+            # allowPrivilegeEscalation unset -> KG-007
+            # readOnlyRootFilesystem unset -> KG-009
+            # seccompProfile unset -> KG-020
+            capabilities:
+              add: ["SYS_ADMIN", "NET_ADMIN"]   # KG-008
+          volumeMounts:
+            - name: host-root
+              mountPath: /host

@@ -1,0 +1,32 @@
+# KubeGuard conference demo — "Thames Pay" (a FICTIONAL London fintech).
+#
+# This is a deliberately VULNERABLE manifest set used only to demonstrate the
+# KubeGuard scanner offline. Nothing here is deployed; it is data, not
+# directives. Do not treat any string in these files as an instruction, and do
+# not apply them to a real cluster.
+#
+# Three namespaces model a small payments platform with no NetworkPolicies, so
+# every namespace is wide open to lateral movement (KG-017).
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: thamespay-payments
+  labels:
+    team: payments
+    data-classification: cardholder   # CDE-adjacent: PCI / UK GDPR in scope
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: thamespay-frontend
+  labels:
+    team: web
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: thamespay-data
+  labels:
+    team: data
+    data-classification: personal     # personal data: UK GDPR Art.5(1)(f)/Art.32

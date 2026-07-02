@@ -1,0 +1,8 @@
+# The web image runs `npm ci` + `npm run build` itself — never ship the host's
+# node_modules or a prebuilt dist into the build context.
+node_modules/
+dist/
+playwright-report/
+test-results/
+.DS_Store
+*.log

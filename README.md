@@ -33,17 +33,19 @@ Compliance (indicative mapping — breached of assessed):
 
 - **20 built-in checks** (CIS/NSA-mapped), deterministic, evidence-backed.
 - **Capability-based attack paths** with MITRE ATT&CK technique IDs.
-- **6 compliance frameworks** (CIS, NIST 800-53, PCI DSS v4.0, ISO 27001:2022,
-  DPDP 2023, NCA ECC-1) as data-driven packs — adding one is a YAML drop-in.
+- **9 compliance frameworks** (CIS, NIST 800-53, PCI DSS v4.0, ISO 27001:2022,
+  DPDP 2023, NCA ECC-1, NCSC CAF 4.0, Cyber Essentials, UK GDPR / DPA 2018) as
+  data-driven packs — adding one is a YAML drop-in.
 - **Reporters:** console (colour), JSON, SARIF 2.1.0, self-contained HTML
-  dashboard; file/SQLite **history** for drift.
+  dashboard, and **`evidence`** — an offline auditor evidence pack (HTML + JSON)
+  per framework; file/SQLite **history** for drift.
 - **`harden`** emits a least-privilege baseline that scans to **zero** findings.
 
 ## Deployment modes
 
 | Mode | Command | Docs |
 |---|---|---|
-| **CLI** (offline) | `kubeguard scan -i <path> -f console\|json\|sarif\|html` | [QUICKSTART](QUICKSTART.md) |
+| **CLI** (offline) | `kubeguard scan -i <path> -f console\|json\|sarif\|html\|evidence` | [QUICKSTART](QUICKSTART.md) |
 | **CI gate** | `kubeguard scan -i <path> --fail-on high` (exit 2) | [QUICKSTART](QUICKSTART.md) |
 | **kubectl plugin** | `kubectl kubeguard scan --live` | [kubectl-plugin.md](docs/kubectl-plugin.md) |
 | **Live** (read-only) | `kubeguard scan --live` | [security-model.md](docs/security-model.md) |

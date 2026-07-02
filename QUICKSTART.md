@@ -19,6 +19,7 @@ kubeguard scan -i ./manifests                       # console
 kubeguard scan -i ./manifests -f json  -o out.json
 kubeguard scan -i ./manifests -f sarif -o out.sarif # for code scanning
 kubeguard scan -i ./manifests -f html  -o report.html
+kubeguard scan -i ./manifests -f evidence -o ./evidence  # per-framework auditor evidence packs (HTML+JSON)
 kubeguard scan -i ./manifests --assume-breach       # model an in-cluster foothold
 kubeguard scan -i ./manifests -p cis                # CIS-aligned profile
 ```

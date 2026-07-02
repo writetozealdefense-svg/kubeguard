@@ -1,0 +1,275 @@
+# KubeGuard conference demo — "Thames Pay" HARDENED.
+#
+# The same fictional platform as demo/manifests, remediated: scans to 0 findings,
+# 0 attack paths, and 100% of assessed controls passing across all 9 frameworks.
+# The over-permissioned privileged node-agent DaemonSet was removed entirely
+# (the simplest remediation is to not run it). Data, not directives.
+#
+# Per namespace: Pod Security Admission "restricted" + a default-deny
+# NetworkPolicy (KG-017). Per workload: non-root, seccomp RuntimeDefault, all
+# capabilities dropped, no host namespaces, digest-pinned images, resource
+# limits, auto-mount disabled, a dedicated least-privilege ServiceAccount, and
+# ClusterIP-only Services.
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: thamespay-payments
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: latest
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: thamespay-frontend
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: latest
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: thamespay-data
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: latest
+---
+# Default-deny NetworkPolicy in every namespace -> KG-017 clean.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny
+  namespace: thamespay-payments
+spec:
+  podSelector: {}
+  policyTypes: ["Ingress", "Egress"]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny
+  namespace: thamespay-frontend
+spec:
+  podSelector: {}
+  policyTypes: ["Ingress", "Egress"]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny
+  namespace: thamespay-data
+spec:
+  podSelector: {}
+  policyTypes: ["Ingress", "Egress"]
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: checkout-sa
+  namespace: thamespay-payments
+automountServiceAccountToken: false   # KG-015 clean
+---
+# Scoped, namespaced, least-privilege role: no secrets / pods / wildcard.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: checkout-config-reader
+  namespace: thamespay-payments
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: checkout-config-reader-binding
+  namespace: thamespay-payments
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: checkout-config-reader
+subjects:
+  - kind: ServiceAccount
+    name: checkout-sa
+    namespace: thamespay-payments
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: checkout
+  namespace: thamespay-payments
+  labels:
+    app: checkout
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: checkout
+  template:
+    metadata:
+      labels:
+        app: checkout
+    spec:
+      serviceAccountName: checkout-sa
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: checkout
+          image: registry.thamespay.example/checkout:1.4.2@sha256:5b1f1c0e0d3c2b4a6f8e9d0c1b2a3948576635241f0e9d8c7b6a5948372615f0
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+          securityContext:
+            privileged: false
+            runAsNonRoot: true
+            runAsUser: 1000
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+            seccompProfile:
+              type: RuntimeDefault
+          ports:
+            - containerPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: checkout-svc
+  namespace: thamespay-payments
+spec:
+  type: ClusterIP                    # KG-018 clean
+  selector:
+    app: checkout
+  ports:
+    - port: 80
+      targetPort: 8080
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: web-sa
+  namespace: thamespay-frontend
+automountServiceAccountToken: false
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  namespace: thamespay-frontend
+  labels:
+    app: web
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: web
+  template:
+    metadata:
+      labels:
+        app: web
+    spec:
+      serviceAccountName: web-sa     # dedicated SA -> KG-016 clean
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: web
+          image: registry.thamespay.example/web:2.1.0@sha256:9c2a1b0e0d3c2b4a6f8e9d0c1b2a3948576635241f0e9d8c7b6a5948372615ab
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "250m"
+              memory: "128Mi"
+          securityContext:
+            privileged: false
+            runAsNonRoot: true
+            runAsUser: 1000
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+            seccompProfile:
+              type: RuntimeDefault
+          ports:
+            - containerPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-svc
+  namespace: thamespay-frontend
+spec:
+  type: ClusterIP
+  selector:
+    app: web
+  ports:
+    - port: 80
+      targetPort: 8080
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ledger-sa
+  namespace: thamespay-data
+automountServiceAccountToken: false
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: ledger
+  namespace: thamespay-data
+  labels:
+    app: ledger
+spec:
+  serviceName: ledger
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ledger
+  template:
+    metadata:
+      labels:
+        app: ledger
+    spec:
+      serviceAccountName: ledger-sa
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: ledger
+          image: registry.thamespay.example/ledger:15.6@sha256:7d3c2b4a6f8e9d0c1b2a3948576635241f0e9d8c7b6a5948372615f0a1b2c3d4
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "256Mi"
+            limits:
+              cpu: "1"
+              memory: "512Mi"
+          securityContext:
+            privileged: false
+            runAsNonRoot: true
+            runAsUser: 999
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+            seccompProfile:
+              type: RuntimeDefault
+          ports:
+            - containerPort: 5432

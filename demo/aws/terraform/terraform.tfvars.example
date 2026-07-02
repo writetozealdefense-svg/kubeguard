@@ -1,0 +1,17 @@
+# Copy to terraform.tfvars and fill in. terraform.tfvars is git-ignored.
+
+# REQUIRED: your public IP as a /32. Find it with:
+#   curl -s https://checkip.amazonaws.com
+presenter_cidr = "203.0.113.7/32"
+
+# REQUIRED: an existing EC2 key pair name in the region below.
+key_name = "my-demo-key"
+
+# Optional overrides:
+region        = "eu-west-2" # London
+instance_type = "t3.large"
+ttl_minutes   = 360         # auto power-off safety-net
+
+# Optional cost alert (leave email empty to skip the budget entirely):
+notification_email = ""
+budget_limit_usd   = "20"

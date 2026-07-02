@@ -1,0 +1,39 @@
+# Keep the build context small and reproducible. The Go image only needs the
+# module + source; everything below is regenerated, large, or irrelevant.
+
+# VCS / CI / editor
+.git/
+.github/
+.idea/
+.vscode/
+.DS_Store
+
+# Frontend build + deps (the web image builds these itself)
+web/node_modules/
+web/dist/
+web/playwright-report/
+web/test-results/
+
+# Go / release build output
+dist/
+bin/
+/kubeguard
+/kubeguard.exe
+/kubectl-kubeguard
+/kubectl-kubeguard.exe
+*.test
+*.out
+coverage.*
+
+# Local scan outputs / stores
+*.sarif
+*.kgdb
+*.sqlite
+
+# The sibling mount + agent scratch
+/KubeGuard/
+.claude/
+
+# Compose/docs don't belong in the image build
+docker-compose.yml
+docs/

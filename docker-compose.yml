@@ -1,0 +1,84 @@
+# KubeGuard — local development stack.
+#
+#   docker compose up --build        # build + run the full stack
+#   open http://localhost:8088       # dashboard UI (log in with the admin token)
+#
+# Three services on a private network:
+#   postgres  persistence (scans/history/audit survive restarts)
+#   api       the Go BFF (`kubeguard dashboard`) over the bundled fixtures
+#   web       the React SPA behind nginx, proxying /v1 to the api
+#
+# The api scans two bundled fixtures as stand-in clusters:
+#   prod-eu    -> test/fixtures/vulnerable.yaml   (findings + attack paths)
+#   staging-us -> test/fixtures/hardened.yaml     (clean / 100% of assessed)
+#
+# To run WITHOUT Postgres (ephemeral, in-memory), comment out the `postgres`
+# service, the api `depends_on`, and the api `KUBEGUARD_POSTGRES_DSN` env line.
+
+name: kubeguard
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-kubeguard}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-kubeguard}
+      POSTGRES_DB: ${POSTGRES_DB:-kubeguard}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"   # exposed for `psql` / inspection
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-kubeguard} -d ${POSTGRES_DB:-kubeguard}"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # Bearer token used at the dashboard login screen.
+      KUBEGUARD_ADMIN_TOKEN: ${KUBEGUARD_ADMIN_TOKEN:-local-admin}
+      # Persist to Postgres (runs goose migrations on start). Remove to use the
+      # in-memory store instead.
+      KUBEGUARD_POSTGRES_DSN: "postgres://${POSTGRES_USER:-kubeguard}:${POSTGRES_PASSWORD:-kubeguard}@postgres:5432/${POSTGRES_DB:-kubeguard}?sslmode=disable"
+    command:
+      - "dashboard"
+      - "--addr=:8080"
+      - "--tenant=default"
+      - "--cluster=prod-eu=/fixtures/vulnerable.yaml"
+      - "--cluster=staging-us=/fixtures/hardened.yaml"
+      - "--async-workers=2"
+      - "--retention=720h"
+      - "--schedule=*/5 * * * *"
+      - "--brand=KubeGuard (local)"
+    volumes:
+      - ./test/fixtures:/fixtures:ro
+    ports:
+      - "${API_PORT:-8080}:8080"        # direct API access (curl/Swagger)
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    depends_on:
+      - api
+    environment:
+      # nginx.conf proxies /v1,/healthz,/readyz to this upstream. The nginx
+      # entrypoint substitutes ${BFF_HOST} into the config template at start.
+      BFF_HOST: api:8080
+    volumes:
+      - ./web/nginx.conf:/etc/nginx/templates/default.conf.template:ro
+    ports:
+      - "${WEB_PORT:-8088}:8080"        # the dashboard UI
+    restart: unless-stopped
+
+volumes:
+  pgdata:

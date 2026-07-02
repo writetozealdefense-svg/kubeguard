@@ -1,0 +1,112 @@
+# Payments checkout API — the crown-jewel workload and the headline attack chain:
+#   Internet -> LoadBalancer -> privileged pod w/ docker.sock -> node breakout
+#   -> auto-mounted SA token -> cluster-admin RBAC -> lateral movement (no NetPol).
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: checkout-sa
+  namespace: thamespay-payments
+# automountServiceAccountToken defaults to true -> KG-015
+---
+# Literal cluster-admin binding for an app ServiceAccount -> KG-011.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: checkout-cluster-admin
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+  - kind: ServiceAccount
+    name: checkout-sa
+    namespace: thamespay-payments
+---
+# Over-broad role: wildcard rule (KG-012) + secrets read (KG-013) + pod create
+# and exec (KG-014).
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: checkout-power
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["pods", "pods/exec"]
+    verbs: ["create", "get"]
+  - apiGroups: ["*"]
+    resources: ["*"]
+    verbs: ["*"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: checkout-power-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: checkout-power
+subjects:
+  - kind: ServiceAccount
+    name: checkout-sa
+    namespace: thamespay-payments
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: checkout
+  namespace: thamespay-payments
+  labels:
+    app: checkout
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: checkout
+  template:
+    metadata:
+      labels:
+        app: checkout
+    spec:
+      serviceAccountName: checkout-sa
+      hostNetwork: true        # KG-003
+      hostPID: true            # KG-004
+      volumes:
+        - name: docker-sock    # KG-002 (sensitive hostPath)
+          hostPath:
+            path: /var/run/docker.sock
+            type: Socket
+      containers:
+        - name: checkout
+          image: registry.thamespay.example/checkout:latest   # KG-019 (mutable tag)
+          # No resources block -> KG-010
+          securityContext:
+            privileged: true        # KG-001 (critical)
+            runAsUser: 0            # KG-006 (runs as root)
+            # allowPrivilegeEscalation unset -> KG-007
+            # readOnlyRootFilesystem unset -> KG-009
+            # seccompProfile unset -> KG-020
+            capabilities:
+              add: ["SYS_ADMIN"]   # KG-008 (dangerous capability)
+          volumeMounts:
+            - name: docker-sock
+              mountPath: /var/run/docker.sock
+          ports:
+            - containerPort: 8080
+---
+# Internet-facing LoadBalancer fronting the vulnerable workload -> KG-018.
+apiVersion: v1
+kind: Service
+metadata:
+  name: checkout-lb
+  namespace: thamespay-payments
+spec:
+  type: LoadBalancer
+  selector:
+    app: checkout
+  ports:
+    - port: 80
+      targetPort: 8080
+# No NetworkPolicy in thamespay-payments -> KG-017 (lateral movement).

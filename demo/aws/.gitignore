@@ -1,0 +1,14 @@
+# Local secrets / config — never commit
+config.env
+terraform/terraform.tfvars
+
+# Terraform state & plugins
+terraform/.terraform/
+terraform/.terraform.lock.hcl
+terraform/*.tfstate
+terraform/*.tfstate.*
+terraform/crash.log
+
+# Run artifacts
+kubeguard-linux-amd64
+out/

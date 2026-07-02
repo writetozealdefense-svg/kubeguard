@@ -127,7 +127,7 @@ before a real production launch.
 
 ### ✅ Already complete
 
-- [x] Engine: 20 checks, attack paths, 6 compliance frameworks, hardening bundle
+- [x] Engine: 20 checks, attack paths, 9 compliance frameworks, hardening bundle
 - [x] Dashboard: 6 lenses + Audit + Reports, SSE live updates, React Flow attack graph
 - [x] Auth: JWT RS256/ES256, JWKS, algorithm-confusion defense, RBAC (viewer/analyst/admin)
 - [x] Postgres: goose migrations, retention, tenant isolation, integration tests vs Postgres 16

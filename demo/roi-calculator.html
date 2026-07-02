@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KubeGuard — ROI calculator</title>
+<!-- Self-contained and offline: no external assets, no telemetry, no network.
+     Matches KubeGuard's own ethos. Open it on an air-gapped laptop. -->
+<style>
+:root{--bg:#0f1419;--panel:#1a2029;--fg:#e6e6e6;--mut:#8a93a0;--line:#2a323d;
+--teal:#0D9488;--teal2:#2dd4bf;--amber:#F59E0B;--ok:#5cd28a}
+*{box-sizing:border-box}
+body{margin:0;font:14px/1.5 system-ui,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--fg)}
+header{padding:20px 24px;border-bottom:1px solid var(--line)}
+h1{margin:0;font-size:20px}.sub{color:var(--mut);font-size:12px;margin-top:4px}
+main{padding:24px;max-width:1040px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:24px}
+@media(max-width:820px){main{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px}
+h2{margin:0 0 12px;font-size:14px;text-transform:uppercase;letter-spacing:.06em;color:var(--mut)}
+.row{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:10px 0}
+.row label{flex:1;font-size:13px}
+.row .hint{display:block;color:var(--mut);font-size:11px}
+input[type=number]{width:130px;background:#11161d;border:1px solid var(--line);color:var(--fg);
+border-radius:6px;padding:7px 9px;font:13px ui-monospace,Consolas,monospace;text-align:right}
+input:focus{outline:none;border-color:var(--teal)}
+.lever{display:flex;justify-content:space-between;align-items:baseline;padding:10px 0;border-bottom:1px solid var(--line)}
+.lever .name{font-weight:600}.lever .formula{display:block;color:var(--mut);font-size:11px;font-family:ui-monospace,Consolas,monospace}
+.lever .val{font-family:ui-monospace,Consolas,monospace;color:var(--teal2);font-size:15px;white-space:nowrap}
+.total{display:flex;justify-content:space-between;align-items:baseline;margin-top:14px;padding-top:12px}
+.total .name{font-size:15px;font-weight:700}
+.total .val{font-family:ui-monospace,Consolas,monospace;color:var(--ok);font-size:26px;font-weight:700}
+.disc{color:var(--mut);font-size:11px;margin-top:14px;line-height:1.5}
+.pill{display:inline-block;background:#11161d;border:1px solid var(--line);border-radius:999px;
+padding:2px 10px;font-size:11px;color:var(--amber);margin-bottom:10px}
+.cur{display:flex;gap:8px;align-items:center;margin-top:6px}
+.cur select{background:#11161d;border:1px solid var(--line);color:var(--fg);border-radius:6px;padding:5px 8px}
+button{background:var(--teal);border:0;color:#04201d;font-weight:700;border-radius:6px;padding:8px 14px;cursor:pointer}
+button:hover{background:var(--teal2)}
+@media print{body{background:#fff;color:#000}.card{border-color:#ccc}input{border-color:#ccc}}
+</style></head><body>
+<header>
+<h1>KubeGuard — ROI calculator</h1>
+<div class="sub">Estimate annual value across four levers. Figures are illustrative — replace every input with your own. Runs fully offline; nothing is sent anywhere.</div>
+</header>
+<main>
+  <section class="card">
+    <span class="pill">YOUR ESTATE</span>
+    <h2>Inputs</h2>
+    <div class="cur"><label>Currency</label>
+      <select id="cur">
+        <option value="£">£ GBP</option>
+        <option value="$">$ USD</option>
+        <option value="€">€ EUR</option>
+      </select>
+    </div>
+
+    <div class="row"><label>Formal audits / year<span class="hint">Cyber Essentials, ISO, SOC 2, PCI…</span></label><input type="number" id="audits" value="2" min="0" step="1"></div>
+    <div class="row"><label>Evidence-prep days saved / audit<span class="hint">Manual screenshotting &amp; spreadsheets replaced</span></label><input type="number" id="daysSaved" value="10" min="0" step="1"></div>
+    <div class="row"><label>Blended day rate<span class="hint">Consultant / GRC analyst</span></label><input type="number" id="dayRate" value="1000" min="0" step="50"></div>
+
+    <div class="row"><label>Tool spend you can retire / year<span class="hint">Point tools + avoidable per-asset CNAPP seats</span></label><input type="number" id="toolSpend" value="30000" min="0" step="1000"></div>
+
+    <div class="row"><label>Engineer hours saved / month<span class="hint">Triage, prioritisation, CI gating</span></label><input type="number" id="engHrs" value="20" min="0" step="1"></div>
+    <div class="row"><label>Engineer cost / hour<span class="hint">Fully loaded</span></label><input type="number" id="engRate" value="60" min="0" step="5"></div>
+
+    <div class="row"><label>Average breach cost<span class="hint">Your modelled incident impact</span></label><input type="number" id="breachCost" value="3500000" min="0" step="100000"></div>
+    <div class="row"><label>Breach-probability reduction<span class="hint">Absolute % — attack-path prioritisation</span></label><input type="number" id="breachRed" value="1" min="0" max="100" step="0.5"></div>
+  </section>
+
+  <section class="card">
+    <span class="pill">ANNUAL VALUE</span>
+    <h2>Estimated return</h2>
+    <div class="lever"><div><span class="name">Audit evidence prep</span><span class="formula" id="f1"></span></div><span class="val" id="v1"></span></div>
+    <div class="lever"><div><span class="name">Tool consolidation</span><span class="formula" id="f2"></span></div><span class="val" id="v2"></span></div>
+    <div class="lever"><div><span class="name">Engineer time reclaimed</span><span class="formula" id="f3"></span></div><span class="val" id="v3"></span></div>
+    <div class="lever"><div><span class="name">Breach expected-loss avoided</span><span class="formula" id="f4"></span></div><span class="val" id="v4"></span></div>
+    <div class="total"><span class="name">Estimated annual value</span><span class="val" id="vtot"></span></div>
+    <p class="disc">
+      <strong>Illustrative, not a guarantee.</strong> These are planning estimates from the inputs you entered — not a promise of savings or a substitute for an auditor's opinion. Breach expected-loss is <code>cost &#xD7; probability reduction</code>, an actuarial expectation, not money you will literally see. KubeGuard's compliance output is an indicative control mapping, never a certification. Replace every number with figures defensible for your organisation.
+    </p>
+    <p style="margin-top:10px"><button onclick="window.print()">Print / save as PDF</button></p>
+  </section>
+</main>
+<script>
+var ids=['audits','daysSaved','dayRate','toolSpend','engHrs','engRate','breachCost','breachRed','cur'];
+function n(id){return parseFloat(document.getElementById(id).value)||0;}
+function fmt(x){var c=document.getElementById('cur').value;return c+Math.round(x).toLocaleString('en-GB');}
+function calc(){
+  var cur=document.getElementById('cur').value;
+  var audit=n('audits')*n('daysSaved')*n('dayRate');
+  var tool=n('toolSpend');
+  var eng=n('engHrs')*12*n('engRate');
+  var breach=n('breachCost')*(n('breachRed')/100);
+  document.getElementById('f1').textContent=n('audits')+' audits × '+n('daysSaved')+' days × '+cur+n('dayRate')+'/day';
+  document.getElementById('f2').textContent='retired tool & seat spend';
+  document.getElementById('f3').textContent=n('engHrs')+' hrs × 12 × '+cur+n('engRate')+'/hr';
+  document.getElementById('f4').textContent=fmt(n('breachCost'))+' × '+n('breachRed')+'% (expected value)';
+  document.getElementById('v1').textContent=fmt(audit);
+  document.getElementById('v2').textContent=fmt(tool);
+  document.getElementById('v3').textContent=fmt(eng);
+  document.getElementById('v4').textContent=fmt(breach);
+  document.getElementById('vtot').textContent=fmt(audit+tool+eng+breach)+' / yr';
+}
+ids.forEach(function(id){var el=document.getElementById(id);el.addEventListener('input',calc);el.addEventListener('change',calc);});
+calc();
+</script>
+</body></html>

@@ -35,6 +35,24 @@ With a cluster selected, **Scan now** (analyst+) triggers a scan; progress strea
 live and the lenses refresh without a reload. Scheduled scans keep everything
 current automatically.
 
+## Export an auditor evidence pack (CLI)
+For a GRC or audit hand-off, the CLI can emit a per-framework **evidence pack**:
+
+```bash
+kubeguard scan -i ./manifests -f evidence -o ./evidence
+```
+
+This writes, into the `-o` directory, one self-contained offline HTML file plus a
+machine-readable JSON sibling per framework (e.g. `ncsc-caf-4.evidence.html` /
+`.json`). Each pack lists every **assessed** control, the KubeGuard checks it
+maps to, and the findings that breached it — with the resource reference,
+redacted evidence, MITRE ATT&CK techniques, and remediation — alongside the
+`breached / passed / assessed` counts, the pass rate, and the indicative-mapping
+disclaimer. Controls KubeGuard cannot evaluate (`assessable:false`) are excluded
+from the denominator, never silently passed. Output is deterministic: the only
+timestamp is the single `generatedAt`, so packs diff cleanly across scans. No
+external assets are referenced and no secret values are emitted.
+
 ## Reading the metrics honestly
 Every compliance figure is shown as **`breached of assessed`** /
 **`passed of assessed`** with an indicative-mapping disclaimer — never a bare

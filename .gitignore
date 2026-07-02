@@ -17,6 +17,9 @@ coverage.txt
 coverage.xml
 coverage.cov
 
+# Local env file (compose reads it; holds local-only ports/creds, never commit)
+.env
+
 # Local scan outputs and history stores
 *.sarif
 *.kgdb
