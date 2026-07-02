@@ -9,6 +9,7 @@ import (
 	"github.com/kubeguard/kubeguard/internal/compliance"
 	"github.com/kubeguard/kubeguard/internal/graph"
 	"github.com/kubeguard/kubeguard/internal/model"
+	"github.com/kubeguard/kubeguard/internal/risk"
 	"github.com/kubeguard/kubeguard/pkg/api"
 )
 
@@ -30,12 +31,14 @@ func Analyze(resources []model.Resource, profileName string, assumeBreach bool) 
 	frameworks := compliance.EvaluateAll(packs, profile.RunnableIDs(), compliance.FiredChecks(findings))
 
 	coverage := g.Coverage()
-	return api.Report{
+	rep := api.Report{
 		Profile:    profile.Name,
 		Findings:   findings,
 		Paths:      paths,
 		Posture:    compliance.Summarize(findings, paths, frameworks),
 		Compliance: frameworks,
 		Coverage:   &coverage,
-	}, nil
+	}
+	rep.TopRisks = risk.Score(rep)
+	return rep, nil
 }

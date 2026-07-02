@@ -84,6 +84,9 @@ func Console(w io.Writer, r api.Report, color bool) error {
 			return err
 		}
 	}
+	if err := consoleTopRisks(w, r.TopRisks, color); err != nil {
+		return err
+	}
 	if err := consoleCoverage(w, r.Coverage); err != nil {
 		return err
 	}
@@ -91,6 +94,40 @@ func Console(w io.Writer, r api.Report, color bool) error {
 		return err
 	}
 	return consoleCompliance(w, r.Compliance)
+}
+
+// consoleTopRisks prints the highest-scoring findings with the factors that
+// produced each score (the "why"). Shows up to the top 5; nil/empty prints
+// nothing. Deterministic — the list is pre-sorted by the risk engine.
+func consoleTopRisks(w io.Writer, risks []api.RiskScore, color bool) error {
+	if len(risks) == 0 {
+		return nil
+	}
+	if _, err := fmt.Fprintf(w, "\nTop risks (deterministic score — see docs/honest-metrics.md):\n"); err != nil {
+		return err
+	}
+	limit := 5
+	if len(risks) < limit {
+		limit = len(risks)
+	}
+	for _, rs := range risks[:limit] {
+		loc := rs.Resource.Name
+		if rs.Resource.Namespace != "" {
+			loc = rs.Resource.Namespace + "/" + rs.Resource.Name
+		}
+		tag := colorize(fmt.Sprintf("[score %3d]", rs.Score), sevColor(rs.Severity), color)
+		if _, err := fmt.Fprintf(w, "  %s %s  %s  (%s %s)\n", tag, rs.FindingID, rs.Title, rs.Resource.Kind, loc); err != nil {
+			return err
+		}
+		parts := make([]string, 0, len(rs.Factors))
+		for _, f := range rs.Factors {
+			parts = append(parts, fmt.Sprintf("%s +%d", f.Name, f.Points))
+		}
+		if _, err := fmt.Fprintf(w, "      why: %s\n", strings.Join(parts, ", ")); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // consoleCoverage prints the honest assessment-coverage line: how much of the

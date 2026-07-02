@@ -62,6 +62,27 @@ had none). Results:
   goldens unchanged.
 - ⟐ No decision items in K1; K2b/K3/K4 decisions handled in their workstreams.
 
+## KSPM K4 — Deterministic, explainable risk prioritization (done)
+
+- **[EXTEND] Risk scoring** (`internal/risk`): a plain published weighted sum
+  over signals the engine already computes — severity, attack-path enablement,
+  internet exposure, blast radius (SA-token→node→cluster-admin, strongest-only),
+  and multi-workload breadth. Every point is recorded as a `RiskFactor`, so the
+  score's "why" is always attached and it is byte-reproducible run-to-run. No ML,
+  no hidden term.
+- Exposed as additive `api.Report.TopRisks` (references findings by id — the
+  findings golden is untouched), on the `scan` console ("Top risks … why: …"),
+  on `GET /v1/posture` (`topRisks`; also recomputed over the merged fleet view),
+  and in OpenAPI (`RiskScore`/`RiskFactor`).
+- ⟐ DECISION (scoring formula): chose a transparent additive model with the
+  weights published in `docs/honest-metrics.md`; blast-radius awards the strongest
+  reached outcome only (not summed) to avoid triple-counting a full chain.
+- **Acceptance:** on `vulnerable.yaml` the cluster-admin-chain enablers (KG-011,
+  KG-001, KG-002, KG-018) rank at the very top, each rendering its factors;
+  `internal/risk/risk_test.go` asserts enablers outrank same-resource low
+  findings, reproducibility, factor-sum == score (no hidden term), and the
+  breadth bonus. risk pkg coverage 87.5%. Full gate green; goldens unchanged.
+
 | Squad | Status | Notes |
 |---|---|---|
 | A — Scaffold | ✅ done | module, §13 layout, cobra + `version`, slog, `.golangci.yml`, CI matrix, 3 golden fixtures |

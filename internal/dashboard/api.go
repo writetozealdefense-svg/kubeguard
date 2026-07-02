@@ -458,6 +458,9 @@ func (a *API) handlePosture(w http.ResponseWriter, r *http.Request) {
 	if rep.Coverage != nil {
 		out["coverage"] = rep.Coverage
 	}
+	if rep.TopRisks != nil {
+		out["topRisks"] = rep.TopRisks
+	}
 	writeJSON(w, http.StatusOK, out)
 }
 

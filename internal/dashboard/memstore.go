@@ -4,6 +4,7 @@ import (
 	"sort"
 	"sync"
 
+	"github.com/kubeguard/kubeguard/internal/risk"
 	"github.com/kubeguard/kubeguard/pkg/api"
 )
 
@@ -259,6 +260,11 @@ func MergeReports(reps []api.Report) api.Report {
 		merged.Posture.OverallPassRate =
 			float64(merged.Posture.ControlsAssessed-merged.Posture.ControlsBreached) /
 				float64(merged.Posture.ControlsAssessed)
+	}
+	// Recompute top risks over the merged fleet so the tenant-wide posture view
+	// prioritizes across all clusters, not per-cluster.
+	if len(merged.Findings) > 0 {
+		merged.TopRisks = risk.Score(merged)
 	}
 	return merged
 }

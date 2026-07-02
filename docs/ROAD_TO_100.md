@@ -167,6 +167,7 @@ launch but sign-off gates the "fully audited" claim.
 
 **🟡 Important**
 
+- [x] Risk prioritization (K4) — *deterministic explainable score in internal/risk; top risks on CLI/posture/report; weights in docs/honest-metrics.md; chain enablers rank first*
 - [x] Live cluster scanning in dashboard — *applied*
 - [x] OpenAPI completeness — *applied*
 - [x] Sign off ARCHITECTURE.md — *applied*

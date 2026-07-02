@@ -379,6 +379,27 @@ components:
         posture: { $ref: "#/components/schemas/PostureSummary" }
         compliance: { type: array, items: { $ref: "#/components/schemas/FrameworkResult" } }
         coverage: { $ref: "#/components/schemas/CoverageBreakdown" }
+        topRisks: { type: array, items: { $ref: "#/components/schemas/RiskScore" } }
+    RiskFactor:
+      type: object
+      required: [name, points, detail]
+      properties:
+        name: { type: string }
+        points: { type: integer }
+        detail: { type: string }
+    RiskScore:
+      type: object
+      required: [findingId, severity, resource, score, factors]
+      description: >
+        Deterministic, explainable risk score for a finding. score = sum of the
+        factors' points; the factors are the full "why" (see docs/honest-metrics.md).
+      properties:
+        findingId: { type: string }
+        title: { type: string }
+        severity: { $ref: "#/components/schemas/Severity" }
+        resource: { $ref: "#/components/schemas/ResourceRef" }
+        score: { type: integer }
+        factors: { type: array, items: { $ref: "#/components/schemas/RiskFactor" } }
     CoverageBreakdown:
       type: object
       required: [discovered, assessable, skipped, rate]

@@ -202,6 +202,31 @@ type CoverageBreakdown struct {
 	SkippedByKind map[string]int `json:"skippedByKind,omitempty"`
 }
 
+// RiskFactor is one contributing signal to a finding's risk score, carrying the
+// points it added and a short human explanation. The set of factors *is* the
+// "why" behind a score — there is no hidden term, so every score is fully
+// reproducible and explainable (ARCHITECTURE.md honest-metrics rule; the weights
+// are published in docs/honest-metrics.md). No ML, no opaque model.
+type RiskFactor struct {
+	Name   string `json:"name"`
+	Points int    `json:"points"`
+	Detail string `json:"detail"`
+}
+
+// RiskScore is a deterministic, explainable priority score for one finding,
+// layered over signals the engine already computes (severity, attack-path
+// enablement, internet exposure, blast radius, affected-workload breadth). It
+// references the finding by id rather than embedding it, so adding risk scoring
+// never perturbs the findings golden. Score is the sum of Factors' points.
+type RiskScore struct {
+	FindingID string       `json:"findingId"`
+	Title     string       `json:"title"`
+	Severity  Severity     `json:"severity"`
+	Resource  ResourceRef  `json:"resource"`
+	Score     int          `json:"score"`
+	Factors   []RiskFactor `json:"factors"`
+}
+
 // Report is the top-level document KubeGuard emits (ARCHITECTURE.md §4.2,
 // §12.4). Fields are populated additively across squads.
 type Report struct {
@@ -216,4 +241,7 @@ type Report struct {
 	// skipped). Optional/additive: nil when a producer didn't compute it, so
 	// existing consumers and golden sub-object comparisons are unaffected.
 	Coverage *CoverageBreakdown `json:"coverage,omitempty"`
+	// TopRisks is the findings ranked by deterministic, explainable risk score
+	// (highest first). Additive/omitempty; references findings by id.
+	TopRisks []RiskScore `json:"topRisks,omitempty"`
 }
