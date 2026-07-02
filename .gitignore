@@ -30,6 +30,10 @@ coverage.cov
 /demo/evidence-hardened/
 /demo/report.*
 
+# Vendored external workshop repo (Damn Vulnerable Kubernetes App); cloned on
+# demand by demo/aws scripts, not part of this repo.
+/demo/aws/dvka/
+
 # Node / frontend
 node_modules/
 web/dist/
