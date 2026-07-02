@@ -170,7 +170,7 @@ launch but sign-off gates the "fully audited" claim.
 - [x] Live cluster scanning in dashboard — *applied*
 - [x] OpenAPI completeness — *applied*
 - [x] Sign off ARCHITECTURE.md — *applied*
-- [ ] Dynamic cluster management · DPDP erasure operator path · Multi-tenant provisioning — *A1 (specced)*
+- [x] Dynamic cluster management — *K1 applied: POST/DELETE /v1/clusters (admin, cluster.write), mutex-guarded source registry lifted out of the closure, MemStore+pg DeleteCluster, OpenAPI + ±/− tests* · [ ] DPDP erasure operator path · Multi-tenant provisioning — *A1a/A1c pending in K8*
 - [ ] Rate limiting in prod · Enable HPA · ServiceMonitor — *Track B (set values)*
 - [ ] ZealDefense integration — *A4 (epic)*
 - [ ] Security contact — *A5*

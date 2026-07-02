@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"sort"
 	"strings"
 
 	"github.com/kubeguard/kubeguard/pkg/api"
@@ -83,10 +84,41 @@ func Console(w io.Writer, r api.Report, color bool) error {
 			return err
 		}
 	}
+	if err := consoleCoverage(w, r.Coverage); err != nil {
+		return err
+	}
 	if err := consolePaths(w, r.Paths, color); err != nil {
 		return err
 	}
 	return consoleCompliance(w, r.Compliance)
+}
+
+// consoleCoverage prints the honest assessment-coverage line: how much of the
+// discovered inventory the engine actually assessed. Nil coverage prints
+// nothing (older producers), so the line is additive.
+func consoleCoverage(w io.Writer, cov *api.CoverageBreakdown) error {
+	if cov == nil || cov.Discovered == 0 {
+		return nil
+	}
+	if _, err := fmt.Fprintf(w, "\nAssessment coverage: %d of %d resources assessed (%.0f%%); %d skipped\n",
+		cov.Assessable, cov.Discovered, cov.Rate*100, cov.Skipped); err != nil {
+		return err
+	}
+	if len(cov.SkippedByKind) > 0 {
+		kinds := make([]string, 0, len(cov.SkippedByKind))
+		for k := range cov.SkippedByKind {
+			kinds = append(kinds, k)
+		}
+		sort.Strings(kinds)
+		parts := make([]string, 0, len(kinds))
+		for _, k := range kinds {
+			parts = append(parts, fmt.Sprintf("%s×%d", k, cov.SkippedByKind[k]))
+		}
+		if _, err := fmt.Fprintf(w, "  skipped kinds (no built-in check): %s\n", strings.Join(parts, ", ")); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func consolePaths(w io.Writer, paths []api.AttackPath, color bool) error {

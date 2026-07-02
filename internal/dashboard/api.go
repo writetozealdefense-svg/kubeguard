@@ -26,6 +26,10 @@ type Config struct {
 	Scanner Scanner
 	Broker  *Broker
 	Audit   AuditLog
+	// Registrar, when set, enables dynamic cluster registration: POST/DELETE
+	// /v1/clusters add/remove a scannable source at runtime. Nil disables those
+	// routes (they return 501) — e.g. a pure-API test with a fixed Scanner.
+	Registrar ClusterRegistrar
 	// BrandTitle co-brands exported engagement reports (e.g. "ZealDefense").
 	// Defaults to "KubeGuard".
 	BrandTitle string
@@ -43,17 +47,18 @@ type Config struct {
 
 // API is the dashboard backend-for-frontend HTTP handler.
 type API struct {
-	store   Store
-	auth    Authenticator
-	scanner Scanner
-	broker  *Broker
-	audit   AuditLog
-	brand   string
-	sec     SecurityConfig
-	rl      *tenantRateLimiter
-	metrics *Metrics
-	pool    *workerPool
-	clock   func() time.Time
+	store     Store
+	auth      Authenticator
+	scanner   Scanner
+	broker    *Broker
+	audit     AuditLog
+	registrar ClusterRegistrar
+	brand     string
+	sec       SecurityConfig
+	rl        *tenantRateLimiter
+	metrics   *Metrics
+	pool      *workerPool
+	clock     func() time.Time
 
 	mu     sync.Mutex
 	nextID int
@@ -73,6 +78,7 @@ func New(cfg Config) *API {
 		newID:   cfg.NewID,
 	}
 	a.audit = cfg.Audit
+	a.registrar = cfg.Registrar
 	a.brand = cfg.BrandTitle
 	a.sec = cfg.Security
 	if a.sec.MaxBodyBytes <= 0 {
@@ -173,6 +179,8 @@ func (a *API) routes() http.Handler {
 			r.Use(a.rl.middleware)
 		}
 		r.Get("/clusters", a.handleClusters)
+		r.With(a.requireRole(RoleAdmin, "cluster.write")).Post("/clusters", a.handleRegisterCluster)
+		r.With(a.requireRole(RoleAdmin, "cluster.write")).Delete("/clusters/{id}", a.handleDeleteCluster)
 		r.Get("/scans", a.handleListScans)
 		r.With(a.requireRole(RoleAnalyst, "scan.trigger")).Post("/scans", a.handleTriggerScan)
 		r.Get("/findings", a.handleFindings)
@@ -191,6 +199,74 @@ func (a *API) routes() http.Handler {
 func (a *API) handleClusters(w http.ResponseWriter, r *http.Request) {
 	p, _ := PrincipalFrom(r.Context())
 	writeJSON(w, http.StatusOK, map[string]any{"clusters": a.store.ListClusters(p.Tenant)})
+}
+
+// handleRegisterCluster adds a cluster + its scannable source at runtime
+// (admin-only). The source string is the same form the CLI accepts for
+// --cluster (an offline manifest path or "live[:context]"); the API stays
+// agnostic to which — the configured registrar interprets it. Idempotent on the
+// store side; a fresh registration is audited and returns 201.
+func (a *API) handleRegisterCluster(w http.ResponseWriter, r *http.Request) {
+	p, _ := PrincipalFrom(r.Context())
+	if a.registrar == nil {
+		writeError(w, http.StatusNotImplemented, "dynamic cluster registration is not enabled")
+		return
+	}
+	var body struct {
+		ID     string `json:"id"`
+		Name   string `json:"name"`
+		Source string `json:"source"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	if body.ID == "" || body.Source == "" {
+		writeError(w, http.StatusBadRequest, "id and source are required")
+		return
+	}
+	if !validClusterID(body.ID) {
+		writeError(w, http.StatusBadRequest, "invalid cluster id")
+		return
+	}
+	// Register the source first so a rejected/malformed source never leaves a
+	// dangling, unscannable cluster row in the store.
+	if err := a.registrar.AddSource(body.ID, body.Source); err != nil {
+		writeError(w, http.StatusBadRequest, fmt.Sprintf("invalid source: %v", err))
+		return
+	}
+	name := body.Name
+	if name == "" {
+		name = body.ID
+	}
+	a.store.RegisterCluster(p.Tenant, Cluster{ID: body.ID, Name: name})
+	a.audit.Write(AuditEntry{At: a.now(), Subject: p.Subject, Tenant: p.Tenant, Action: "cluster.write", Resource: body.ID, Result: "allowed"})
+	c, _ := a.store.GetCluster(p.Tenant, body.ID)
+	writeJSON(w, http.StatusCreated, c)
+}
+
+// handleDeleteCluster deregisters a cluster (admin-only): drops its store rows
+// and its scannable source so subsequent scans 404. Idempotent-ish: a missing
+// cluster returns 404. Audited either way.
+func (a *API) handleDeleteCluster(w http.ResponseWriter, r *http.Request) {
+	p, _ := PrincipalFrom(r.Context())
+	if a.registrar == nil {
+		writeError(w, http.StatusNotImplemented, "dynamic cluster registration is not enabled")
+		return
+	}
+	id := chi.URLParam(r, "id")
+	if !validClusterID(id) {
+		writeError(w, http.StatusBadRequest, "invalid cluster id")
+		return
+	}
+	ok := a.store.DeleteCluster(p.Tenant, id)
+	if !ok {
+		writeError(w, http.StatusNotFound, "unknown cluster")
+		return
+	}
+	a.registrar.RemoveSource(id)
+	a.audit.Write(AuditEntry{At: a.now(), Subject: p.Subject, Tenant: p.Tenant, Action: "cluster.delete", Resource: id, Result: "allowed"})
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (a *API) handleListScans(w http.ResponseWriter, r *http.Request) {
@@ -378,7 +454,11 @@ func (a *API) handlePosture(w http.ResponseWriter, r *http.Request) {
 	if compliance == nil {
 		compliance = []api.FrameworkResult{}
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"posture": rep.Posture, "compliance": compliance})
+	out := map[string]any{"posture": rep.Posture, "compliance": compliance}
+	if rep.Coverage != nil {
+		out["coverage"] = rep.Coverage
+	}
+	writeJSON(w, http.StatusOK, out)
 }
 
 func (a *API) handleAttackPaths(w http.ResponseWriter, r *http.Request) {

@@ -36,6 +36,32 @@ had none). Results:
 
 **Verdict:** baseline green. Proceeding into the KSPM workstreams (K1–K10).
 
+## KSPM K1 — Asset inventory & coverage + dynamic cluster registration (done)
+
+- **[EXTEND] Assessment-coverage %:** `graph.Coverage()` classifies every
+  discovered resource as assessable (a kind the engine normalizes + checks
+  reason over) or skipped (tallied by kind, reason = no built-in check),
+  yielding an honest `assessable/discovered` rate. Surfaced as
+  `api.Report.Coverage` (additive pointer — golden sub-object comparisons
+  unaffected), on the `scan` console output ("Assessment coverage: N of M …"),
+  and on `GET /v1/posture` (`coverage` object; OpenAPI `CoverageBreakdown`).
+- **[EXTEND] Dynamic cluster registration (was A1b):** the cluster→source map is
+  lifted out of the `--cluster` closure into a mutex-guarded `sourceRegistry`
+  (`internal/cli/clustersource.go`) implementing the new
+  `dashboard.ClusterRegistrar` seam; the scanner reads the live set.
+  `POST /v1/clusters {id,name,source}` and `DELETE /v1/clusters/{id}` are gated
+  `requireRole(RoleAdmin,"cluster.write")`, audited, and disabled (501) when no
+  registrar is wired. `DeleteCluster` added to the `Store` interface + `MemStore`
+  + `pg.Store` (cascades scans/history). OpenAPI paths + `RegisterClusterRequest`
+  schema added.
+- **Acceptance:** `internal/dashboard/clusters_test.go` — add→appears→scannable,
+  delete→404-on-scan, analyst→403 on both writes, malformed source→400 (no
+  dangling cluster), no-registrar→501, full audit trail (write/delete/denied).
+  `internal/graph/coverage_test.go` — assessable/skipped/rate + empty inventory.
+  OpenAPI still validates. `make check` equivalent green (build/vet/lint/test);
+  goldens unchanged.
+- ⟐ No decision items in K1; K2b/K3/K4 decisions handled in their workstreams.
+
 | Squad | Status | Notes |
 |---|---|---|
 | A — Scaffold | ✅ done | module, §13 layout, cobra + `version`, slog, `.golangci.yml`, CI matrix, 3 golden fixtures |

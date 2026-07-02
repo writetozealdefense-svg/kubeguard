@@ -69,13 +69,18 @@ func newDashboardCmd() *cobra.Command {
 			// A cluster source is either an offline manifest path or a live cluster.
 			// Live sources are written as "live" (current kubecontext) or
 			// "live:<context>"; everything else is treated as an offline path.
-			paths := map[string]string{}
+			// The source map is owned by a mutex-guarded registrar so the dynamic
+			// POST/DELETE /v1/clusters routes can add/remove sources at runtime and
+			// the scanner reads the current set (was a captured closure map before).
+			sources := newSourceRegistry()
 			for _, spec := range clusterSpecs {
 				id, path, ok := strings.Cut(spec, "=")
 				if !ok || id == "" || path == "" {
 					return fmt.Errorf("invalid --cluster %q, want id=<manifest-path|live[:context]>", spec)
 				}
-				paths[id] = path
+				if err := sources.AddSource(id, path); err != nil {
+					return fmt.Errorf("invalid --cluster %q: %w", spec, err)
+				}
 			}
 
 			// Storage backend: Postgres when --postgres is set (runs migrations,
@@ -98,12 +103,12 @@ func newDashboardCmd() *cobra.Command {
 			} else {
 				store = dashboard.NewMemStore()
 			}
-			for id := range paths {
+			for _, id := range sources.ids() {
 				store.RegisterCluster(tenant, dashboard.Cluster{ID: id, Name: id})
 			}
 
 			scanner := func(ctx context.Context, clusterID string) (api.Report, error) {
-				path, ok := paths[clusterID]
+				path, ok := sources.source(clusterID)
 				if !ok {
 					return api.Report{}, fmt.Errorf("unknown cluster %q", clusterID)
 				}
@@ -160,6 +165,7 @@ func newDashboardCmd() *cobra.Command {
 			}
 			a := dashboard.New(dashboard.Config{
 				Store: store, Auth: auth, Scanner: scanner, BrandTitle: brand, Audit: auditLog,
+				Registrar: sources,
 				Security: dashboard.SecurityConfig{
 					AllowedOrigins: allowedOrig,
 					RatePerSecond:  rateLimit,
@@ -171,15 +177,16 @@ func newDashboardCmd() *cobra.Command {
 			defer a.Close()
 
 			// Initial scan per cluster so the lenses have data immediately.
-			for id := range paths {
+			for _, id := range sources.ids() {
 				a.RunScan(cmd.Context(), tenant, id, "init")
 			}
 
 			// Optional cron scheduler — continuously re-scans every cluster so the
 			// compliance/trend/attack-path views stay current without user action.
 			if schedule != "" {
-				specs := make([]dashboard.ScheduleSpec, 0, len(paths))
-				for id := range paths {
+				ids := sources.ids()
+				specs := make([]dashboard.ScheduleSpec, 0, len(ids))
+				for _, id := range ids {
 					specs = append(specs, dashboard.ScheduleSpec{Tenant: tenant, ClusterID: id, Cron: schedule})
 				}
 				sched := dashboard.NewScheduler(a, specs)

@@ -63,6 +63,22 @@ type HistorySnapshot struct {
 // Scanner only produces a report (or an error).
 type Scanner func(ctx context.Context, clusterID string) (api.Report, error)
 
+// ClusterRegistrar is the seam that lets the API register/deregister a
+// scannable *source* for a cluster at runtime. The API knows a cluster has a
+// source; it deliberately does not know whether that source is an offline
+// manifest path or a live kubecontext — that distinction is owned by the
+// command wiring (internal/cli/dashboard.go), which supplies the concrete
+// registrar and the matching Scanner. When no registrar is configured (e.g. a
+// pure API test), the cluster-write routes are disabled.
+//
+// AddSource must reject a malformed/empty source with an error; RemoveSource is
+// idempotent. Implementations must be safe for concurrent use — the API mutates
+// sources from request handlers while the Scanner reads them.
+type ClusterRegistrar interface {
+	AddSource(clusterID, source string) error
+	RemoveSource(clusterID string)
+}
+
 // Store is the BFF persistence boundary. The in-memory implementation backs D2;
 // Squad P1 swaps in a Postgres-backed implementation behind this same interface.
 // Every method is tenant-scoped — callers pass the authenticated tenant and the
@@ -70,6 +86,10 @@ type Scanner func(ctx context.Context, clusterID string) (api.Report, error)
 type Store interface {
 	// RegisterCluster adds a cluster to a tenant (idempotent).
 	RegisterCluster(tenant string, c Cluster)
+	// DeleteCluster removes a cluster and all of its scans/history from a tenant.
+	// Returns false if the cluster did not exist. Tenant-scoped: never touches
+	// another tenant's rows.
+	DeleteCluster(tenant, clusterID string) bool
 	ListClusters(tenant string) []Cluster
 	GetCluster(tenant, clusterID string) (Cluster, bool)
 	ListScans(tenant, clusterID string, limit, offset int) ([]Scan, int)

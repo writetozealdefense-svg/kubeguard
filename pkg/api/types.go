@@ -155,6 +155,53 @@ type PostureSummary struct {
 	OverallPassRate  float64          `json:"overallPassRate"`
 }
 
+// EvidenceControl is one assessed control in an auditor evidence pack: the
+// control, the KubeGuard checks it maps to, and the full findings that breached
+// it (with redacted evidence, ATT&CK technique refs, and remediation). It reuses
+// Finding rather than defining a parallel finding shape.
+type EvidenceControl struct {
+	ControlID string    `json:"controlId"`
+	Title     string    `json:"title,omitempty"`
+	MapsTo    []string  `json:"mapsTo"`
+	Breached  bool      `json:"breached"`
+	Findings  []Finding `json:"findings,omitempty"`
+}
+
+// EvidencePack is the deterministic auditor evidence export for one framework.
+// Only assessed controls (assessable and fully evaluated) appear; the honest
+// denominator and indicative-mapping disclaimer travel with it. The single
+// GeneratedAt is the only wall-clock timestamp.
+type EvidencePack struct {
+	GeneratedAt string            `json:"generatedAt"`
+	Source      string            `json:"source"`
+	Profile     string            `json:"profile"`
+	ID          string            `json:"id"`
+	Framework   string            `json:"framework"`
+	Version     string            `json:"version,omitempty"`
+	Assessed    int               `json:"assessed"`
+	Breached    int               `json:"breached"`
+	Passed      int               `json:"passed"`
+	PassRate    float64           `json:"passRate"`
+	Controls    []EvidenceControl `json:"controls"`
+	Disclaimer  string            `json:"disclaimer"`
+}
+
+// CoverageBreakdown reports how much of the discovered inventory the engine
+// actually assessed — the honest denominator behind an assessment-coverage %.
+// A resource is "assessable" when its kind is one the graph normalizes and the
+// checks reason over (workloads, RBAC, Service, NetworkPolicy, Namespace);
+// anything else is discovered-but-skipped, tallied by kind with the reason that
+// no built-in check evaluates it. Rate = assessable/discovered (0 when empty).
+// Same honesty rule as compliance denominators: we never silently drop what we
+// could not assess.
+type CoverageBreakdown struct {
+	Discovered    int            `json:"discovered"`
+	Assessable    int            `json:"assessable"`
+	Skipped       int            `json:"skipped"`
+	Rate          float64        `json:"rate"`
+	SkippedByKind map[string]int `json:"skippedByKind,omitempty"`
+}
+
 // Report is the top-level document KubeGuard emits (ARCHITECTURE.md §4.2,
 // §12.4). Fields are populated additively across squads.
 type Report struct {
@@ -165,4 +212,8 @@ type Report struct {
 	Paths       []AttackPath      `json:"paths,omitempty"`
 	Posture     PostureSummary    `json:"posture"`
 	Compliance  []FrameworkResult `json:"compliance,omitempty"`
+	// Coverage is the assessment-coverage breakdown (discovered vs assessable vs
+	// skipped). Optional/additive: nil when a producer didn't compute it, so
+	// existing consumers and golden sub-object comparisons are unaffected.
+	Coverage *CoverageBreakdown `json:"coverage,omitempty"`
 }

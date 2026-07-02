@@ -97,6 +97,26 @@ func (s *Store) RegisterCluster(tenant string, c dashboard.Cluster) {
 	}
 }
 
+// DeleteCluster removes a cluster and all of its scans/history from a tenant.
+// Returns false if the cluster did not exist. Tenant-scoped.
+func (s *Store) DeleteCluster(tenant, clusterID string) bool {
+	ctx := context.Background()
+	// Remove dependent rows first (no cross-table FKs, so order is explicit).
+	for _, table := range []string{"history", "scans"} {
+		if _, err := s.pool.Exec(ctx,
+			fmt.Sprintf("DELETE FROM %s WHERE tenant=$1 AND cluster_id=$2", table), tenant, clusterID); err != nil {
+			slog.Error("pg delete cluster deps", "table", table, "err", err)
+			return false
+		}
+	}
+	ct, err := s.pool.Exec(ctx, `DELETE FROM clusters WHERE tenant=$1 AND id=$2`, tenant, clusterID)
+	if err != nil {
+		slog.Error("pg delete cluster", "err", err)
+		return false
+	}
+	return ct.RowsAffected() > 0
+}
+
 // ListClusters returns a tenant's clusters in registration order.
 func (s *Store) ListClusters(tenant string) []dashboard.Cluster {
 	rows, err := s.pool.Query(context.Background(),

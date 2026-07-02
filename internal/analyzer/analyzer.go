@@ -29,11 +29,13 @@ func Analyze(resources []model.Resource, profileName string, assumeBreach bool) 
 	paths := attack.BuildPaths(g, assumeBreach)
 	frameworks := compliance.EvaluateAll(packs, profile.RunnableIDs(), compliance.FiredChecks(findings))
 
+	coverage := g.Coverage()
 	return api.Report{
 		Profile:    profile.Name,
 		Findings:   findings,
 		Paths:      paths,
 		Posture:    compliance.Summarize(findings, paths, frameworks),
 		Compliance: frameworks,
+		Coverage:   &coverage,
 	}, nil
 }

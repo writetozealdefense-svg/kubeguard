@@ -52,6 +52,28 @@ func (m *MemStore) RegisterCluster(tenant string, c Cluster) {
 	ts.order = append(ts.order, c.ID)
 }
 
+// DeleteCluster removes a cluster (and its scans/history) from a tenant.
+// Returns false if it was not registered.
+func (m *MemStore) DeleteCluster(tenant, clusterID string) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	ts := m.tenants[tenant]
+	if ts == nil {
+		return false
+	}
+	if _, ok := ts.clusters[clusterID]; !ok {
+		return false
+	}
+	delete(ts.clusters, clusterID)
+	for i, id := range ts.order {
+		if id == clusterID {
+			ts.order = append(ts.order[:i], ts.order[i+1:]...)
+			break
+		}
+	}
+	return true
+}
+
 // ListClusters returns the tenant's clusters in registration order.
 func (m *MemStore) ListClusters(tenant string) []Cluster {
 	m.mu.RLock()

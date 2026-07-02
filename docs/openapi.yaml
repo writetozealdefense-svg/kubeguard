@@ -36,6 +36,44 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ClusterList" }
+    post:
+      operationId: registerCluster
+      summary: Register a cluster and its scannable source at runtime (admin only).
+      description: >
+        Adds a cluster to the caller's tenant and registers its scannable source
+        (an offline manifest path or "live[:context]"). Requires the cluster.write
+        permission (admin). Idempotent on the store; a rejected/malformed source is
+        a 400 and leaves no cluster behind. Returns 501 when dynamic registration
+        is not enabled on the server.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RegisterClusterRequest" }
+      responses:
+        "201":
+          description: registered
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Cluster" }
+        "400": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "501": { $ref: "#/components/responses/Error" }
+  /v1/clusters/{id}:
+    delete:
+      operationId: deleteCluster
+      summary: Deregister a cluster and drop its scans/history (admin only).
+      description: >
+        Removes a cluster from the caller's tenant along with its scans and history,
+        and deregisters its scannable source so subsequent scans 404. Requires the
+        cluster.write permission (admin). Tenant-scoped.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        "204": { description: deleted }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "501": { $ref: "#/components/responses/Error" }
   /v1/scans:
     get:
       operationId: listScans
@@ -148,7 +186,7 @@ paths:
           schema: { type: string, enum: [sarif, csv, pdf], default: sarif }
       responses:
         "200":
-          description: report file (Content-Disposition: attachment)
+          description: "report file (served as a Content-Disposition attachment)"
           content:
             application/sarif+json:
               schema: { type: string, format: binary }
@@ -183,6 +221,11 @@ components:
           schema: { $ref: "#/components/schemas/Error" }
     Error:
       description: bad request
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    NotFound:
+      description: not found
       content:
         application/json:
           schema: { $ref: "#/components/schemas/Error" }
@@ -225,6 +268,13 @@ components:
       required: [clusters]
       properties:
         clusters: { type: array, items: { $ref: "#/components/schemas/Cluster" } }
+    RegisterClusterRequest:
+      type: object
+      required: [id, source]
+      properties:
+        id: { type: string, description: "cluster id (DNS-subdomain charset)" }
+        name: { type: string, description: "display name; defaults to id" }
+        source: { type: string, description: "offline manifest path or \"live[:context]\"" }
     Scan:
       type: object
       required: [id, clusterId, status]
@@ -328,6 +378,21 @@ components:
       properties:
         posture: { $ref: "#/components/schemas/PostureSummary" }
         compliance: { type: array, items: { $ref: "#/components/schemas/FrameworkResult" } }
+        coverage: { $ref: "#/components/schemas/CoverageBreakdown" }
+    CoverageBreakdown:
+      type: object
+      required: [discovered, assessable, skipped, rate]
+      description: >
+        Assessment-coverage breakdown — how much of the discovered inventory the
+        engine actually assessed. rate = assessable/discovered.
+      properties:
+        discovered: { type: integer }
+        assessable: { type: integer }
+        skipped: { type: integer }
+        rate: { type: number }
+        skippedByKind:
+          type: object
+          additionalProperties: { type: integer }
     PathHop:
       type: object
       required: [order, from, to, enabledBy, technique, narrative]
