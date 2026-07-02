@@ -1,0 +1,32 @@
+id: ncsc-caf-4
+title: NCSC Cyber Assessment Framework (CAF) 4.0
+version: "4.0"
+disclaimer: "Indicative mapping to KubeGuard checks only; not an NCSC assessment or certification."
+controls:
+  # Objective B — Protecting against cyber attack.
+  - id: "B2"
+    title: Identity and Access Control
+    mapsTo: ["KG-011", "KG-012", "KG-013", "KG-014", "KG-015", "KG-016"]
+    assessable: true
+  - id: "B3"
+    title: Data Security
+    mapsTo: ["KG-013", "KG-015"]
+    assessable: true
+  - id: "B4"
+    title: System Security
+    mapsTo: ["KG-001", "KG-002", "KG-003", "KG-004", "KG-005", "KG-006", "KG-007", "KG-008", "KG-009", "KG-020"]
+    assessable: true
+  - id: "B5"
+    title: Resilient Networks and Systems
+    mapsTo: ["KG-010", "KG-017", "KG-018"]
+    assessable: true
+  # Objective C — Detecting cyber security events. KubeGuard reasons over static
+  # declarative resources and cannot observe monitoring coverage or event
+  # discovery at runtime, so these principles are not assessable here (honest
+  # metrics: assessed means actually evaluated, never silently passed).
+  - id: "C1"
+    title: Security Monitoring
+    assessable: false
+  - id: "C2"
+    title: Proactive Security Event Discovery
+    assessable: false

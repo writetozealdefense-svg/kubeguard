@@ -1,0 +1,29 @@
+id: cyber-essentials
+title: NCSC Cyber Essentials
+version: "3.1"
+disclaimer: "Indicative mapping to KubeGuard checks only; not an IASME/NCSC Cyber Essentials certification."
+controls:
+  - id: "firewalls"
+    title: Firewalls (boundary and network protection)
+    mapsTo: ["KG-003", "KG-017", "KG-018"]
+    assessable: true
+  - id: "secure-configuration"
+    title: Secure configuration
+    mapsTo: ["KG-001", "KG-002", "KG-006", "KG-007", "KG-008", "KG-009", "KG-020"]
+    assessable: true
+  - id: "user-access-control"
+    title: User access control
+    mapsTo: ["KG-011", "KG-012", "KG-013", "KG-014", "KG-015", "KG-016"]
+    assessable: true
+  # Security update management asks whether software is supported and patched in
+  # time. KubeGuard cannot determine patch currency from declarative manifests
+  # (a mutable image tag is a hygiene smell, not proof of an unpatched system),
+  # so this control is excluded from the denominator rather than guessed.
+  - id: "security-update-management"
+    title: Security update management
+    assessable: false
+  # Malware protection (anti-malware / allow-listing) is a runtime, host-level
+  # control KubeGuard does not observe from static resources.
+  - id: "malware-protection"
+    title: Malware protection
+    assessable: false

@@ -79,6 +79,39 @@ func TestScanFormats(t *testing.T) {
 	}
 }
 
+func TestScanEvidenceExport(t *testing.T) {
+	dir := t.TempDir()
+	if _, err := runCLI(t, "scan", "-i", fixturesDir+"/vulnerable.yaml", "-f", "evidence", "-o", dir); err != nil {
+		t.Fatalf("evidence scan: %v", err)
+	}
+	for _, name := range []string{
+		"uk-gdpr-dpa-2018.evidence.html", "uk-gdpr-dpa-2018.evidence.json",
+		"ncsc-caf-4.evidence.html", "cyber-essentials.evidence.json",
+	} {
+		if _, err := os.Stat(filepath.Join(dir, name)); err != nil {
+			t.Errorf("missing evidence file %s: %v", name, err)
+		}
+	}
+	// The JSON sibling parses into the reused api type with an honest denominator.
+	b, err := os.ReadFile(filepath.Join(dir, "cyber-essentials.evidence.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var ep api.EvidencePack
+	if err := json.Unmarshal(b, &ep); err != nil {
+		t.Fatalf("parse evidence json: %v", err)
+	}
+	if ep.Assessed != 3 { // 2 of 5 controls are assessable:false
+		t.Errorf("cyber-essentials assessed = %d, want 3", ep.Assessed)
+	}
+}
+
+func TestScanEvidenceRequiresOutputDir(t *testing.T) {
+	if _, err := runCLI(t, "scan", "-i", fixturesDir+"/vulnerable.yaml", "-f", "evidence"); err == nil {
+		t.Error("-f evidence without -o should error")
+	}
+}
+
 func TestScanHistoryRoundTrip(t *testing.T) {
 	hp := filepath.Join(t.TempDir(), "h.jsonl")
 	for _, fx := range []string{"vulnerable.yaml", "hardened.yaml"} {
