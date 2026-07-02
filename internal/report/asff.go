@@ -69,10 +69,12 @@ func asffOptionsFromEnv() ASFFOptions {
 // --- ASFF wire types (hand-rolled to keep the core SDK-free) -----------------
 
 type asffDocument struct {
-	Findings []asffFinding `json:"Findings"`
+	Findings []ASFFFinding `json:"Findings"`
 }
 
-type asffFinding struct {
+// ASFFFinding is a single finding in the ASFF document; exported so the
+// Security Hub publisher can reuse the pure report→ASFF mapping via BuildASFF.
+type ASFFFinding struct {
 	SchemaVersion string            `json:"SchemaVersion"`
 	ID            string            `json:"Id"`
 	ProductArn    string            `json:"ProductArn"`
@@ -149,17 +151,17 @@ func ASFFWithOptions(w io.Writer, r api.Report, opts ASFFOptions) error {
 
 // BuildASFF exposes the pure report→ASFF mapping so the Security Hub publisher
 // can reuse it without re-serializing JSON.
-func BuildASFF(r api.Report, opts ASFFOptions) []asffFinding {
+func BuildASFF(r api.Report, opts ASFFOptions) []ASFFFinding {
 	return buildASFF(r, opts).Findings
 }
 
 func buildASFF(r api.Report, opts ASFFOptions) asffDocument {
 	ts := r.GeneratedAt // the single document timestamp; reused for Created/Updated
-	out := asffDocument{Findings: make([]asffFinding, 0, len(r.Findings))}
+	out := asffDocument{Findings: make([]ASFFFinding, 0, len(r.Findings))}
 
 	for i, f := range r.Findings {
 		fqn := resourceFQN(f.Resource)
-		af := asffFinding{
+		af := ASFFFinding{
 			SchemaVersion: asffSchemaVersion,
 			// Deterministic, unique id: profile + resource + check + index. The
 			// index guards against the same check firing twice on one resource.
@@ -350,14 +352,14 @@ func asffFirstNonEmpty(vals ...string) string {
 	return ""
 }
 
-func asffTruncate(s string, max int) string {
-	if len(s) <= max {
+func asffTruncate(s string, maxLen int) string {
+	if len(s) <= maxLen {
 		return s
 	}
-	if max <= 3 {
-		return s[:max]
+	if maxLen <= 3 {
+		return s[:maxLen]
 	}
-	return s[:max-3] + "..."
+	return s[:maxLen-3] + "..."
 }
 
 // asffSlug makes a token safe for an ASFF Id segment (no spaces/slashes).
