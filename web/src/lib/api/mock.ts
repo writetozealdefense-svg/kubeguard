@@ -11,6 +11,7 @@ import type {
   AttackPathList,
   ClusterList,
   Finding,
+  FindingLifecycle,
   FindingPage,
   HistoryList,
   PostureResponse,
@@ -189,6 +190,33 @@ function json(body: unknown): Response {
   return new Response(JSON.stringify(body), { status: 200, headers: { "Content-Type": "application/json" } });
 }
 
+// --- findings lifecycle (K6): in-memory triage state for the mock ---
+const mockKey = (f: Finding) => `prod-eu|${f.id}|${f.resource.kind}/${f.resource.namespace ?? ""}/${f.resource.name}`;
+const lifecycleState = new Map<string, FindingLifecycle>();
+function seedLifecycle() {
+  if (lifecycleState.size > 0) return;
+  for (const f of prodFindings) {
+    const key = mockKey(f);
+    lifecycleState.set(key, {
+      key, clusterId: "prod-eu", findingId: f.id, resource: f.resource,
+      state: "open", firstSeen: "2026-06-05T08:00:00Z",
+    });
+  }
+}
+function lifecycleView() {
+  seedLifecycle();
+  const items = [...lifecycleState.values()];
+  const mttr = { open: 0, acknowledged: 0, inProgress: 0, resolved: 0, riskAccepted: 0, meanTimeToResolveHours: 0 };
+  for (const it of items) {
+    if (it.state === "open") mttr.open++;
+    else if (it.state === "acknowledged") mttr.acknowledged++;
+    else if (it.state === "in-progress") mttr.inProgress++;
+    else if (it.state === "resolved") mttr.resolved++;
+    else if (it.state === "risk-accepted") mttr.riskAccepted++;
+  }
+  return { items, mttr };
+}
+
 /** Cluster-aware in-memory transport. */
 export const mockTransport: Transport = async (path, init) => {
   const [url, qs] = path.split("?");
@@ -214,6 +242,39 @@ export const mockTransport: Transport = async (path, init) => {
     });
   }
 
+  // Lifecycle mutations (K6).
+  if (url.startsWith("/v1/lifecycle/") && init?.method) {
+    seedLifecycle();
+    const parts = url.split("/"); // ["", "v1", "lifecycle", key, "state"|"waiver"]
+    const key = decodeURIComponent(parts[3] ?? "");
+    const action = parts[4] ?? "";
+    const lc = lifecycleState.get(key);
+    if (!lc) return new Response("not found", { status: 404 });
+    if (action === "state" && init.method === "POST") {
+      const body = JSON.parse(String(init.body));
+      lc.state = body.state;
+      if (body.assignee) lc.assignee = body.assignee;
+      lc.waiver = undefined;
+      lc.resolvedAt = body.state === "resolved" ? "2026-06-07T18:00:00Z" : undefined;
+      lifecycleState.set(key, lc);
+      return json(lc);
+    }
+    if (action === "waiver" && init.method === "POST") {
+      const body = JSON.parse(String(init.body));
+      lc.state = "risk-accepted";
+      lc.waiver = { justification: body.justification, approvedBy: "local-admin", createdAt: "2026-06-07T08:00:00Z", expiresAt: body.expiresAt };
+      lifecycleState.set(key, lc);
+      return json(lc);
+    }
+    if (action === "waiver" && init.method === "DELETE") {
+      lc.state = "open";
+      lc.waiver = undefined;
+      lifecycleState.set(key, lc);
+      return json(lc);
+    }
+    return new Response("bad request", { status: 400 });
+  }
+
   if (url === "/v1/stream") {
     let self: Listener;
     const stream = new ReadableStream<Uint8Array>({
@@ -236,6 +297,7 @@ export const mockTransport: Transport = async (path, init) => {
     case "/v1/posture": return json(cluster === "staging-us" ? stagingPosture : prodPosture);
     case "/v1/attack-paths": return json(cluster === "staging-us" ? { paths: [] } : prodPaths);
     case "/v1/history": return json(prodHistory);
+    case "/v1/lifecycle": return json(lifecycleView());
     case "/v1/audit": return json({ entries: [
       { at: "2026-06-07T08:00:04Z", subject: "local-admin", tenant: "default", action: "scan.trigger", resource: "prod-eu", result: "allowed" },
     ] });

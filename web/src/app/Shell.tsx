@@ -12,6 +12,7 @@ import type { Role } from "./auth";
 const NAV: ReadonlyArray<{ to: string; label: string; minRole?: Role }> = [
   { to: "/", label: "Overview" },
   { to: "/findings", label: "Findings" },
+  { to: "/triage", label: "Triage" },
   { to: "/compliance", label: "Compliance" },
   { to: "/attack-paths", label: "Attack Paths" },
   { to: "/clusters", label: "Clusters" },

@@ -156,6 +156,84 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/HistoryList" }
+  /v1/lifecycle:
+    get:
+      operationId: listLifecycle
+      summary: Findings triage lane — current findings overlaid with lifecycle state + MTTR.
+      description: >
+        Returns each current finding overlaid with its stored lifecycle state
+        (open/acknowledged/in-progress/resolved/risk-accepted), owner, and waiver,
+        plus the MTTR/state-distribution summary. Waiver expiry is applied: a
+        risk-accepted finding whose waiver has lapsed re-surfaces as open.
+      parameters:
+        - { name: cluster, in: query, schema: { type: string }, description: "cluster id; omit for the fleet view" }
+      responses:
+        "200":
+          description: lifecycle view
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LifecycleView" }
+  /v1/lifecycle/{key}/state:
+    post:
+      operationId: setFindingState
+      summary: Set a finding's triage state / assignee (analyst+).
+      description: >
+        Sets the state to open, acknowledged, in-progress, or resolved and
+        optionally assigns an owner. risk-accepted is NOT settable here — it is
+        reached only by creating a waiver. Audited.
+      parameters:
+        - { name: key, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SetStateRequest" }
+      responses:
+        "200":
+          description: updated lifecycle row
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FindingLifecycle" }
+        "400": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /v1/lifecycle/{key}/waiver:
+    post:
+      operationId: createWaiver
+      summary: Accept risk with a time-boxed, justified waiver (admin only by default).
+      description: >
+        Sets the finding to risk-accepted with a mandatory justification and an
+        expiry (capped at the server's max waiver duration, 90 days by default).
+        Requires the configured approver role (admin by default). Audited.
+      parameters:
+        - { name: key, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateWaiverRequest" }
+      responses:
+        "200":
+          description: waived lifecycle row
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FindingLifecycle" }
+        "400": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      operationId: revokeWaiver
+      summary: Revoke a waiver so the finding re-opens (admin only by default).
+      parameters:
+        - { name: key, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: re-opened lifecycle row
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FindingLifecycle" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
   /v1/audit:
     get:
       operationId: listAudit
@@ -268,6 +346,56 @@ components:
       required: [clusters]
       properties:
         clusters: { type: array, items: { $ref: "#/components/schemas/Cluster" } }
+    Waiver:
+      type: object
+      required: [justification, approvedBy, createdAt, expiresAt]
+      properties:
+        justification: { type: string }
+        approvedBy: { type: string }
+        createdAt: { type: string }
+        expiresAt: { type: string }
+    FindingLifecycle:
+      type: object
+      required: [key, clusterId, findingId, resource, state]
+      properties:
+        key: { type: string, description: "stable finding identity (hash of cluster+check+resource)" }
+        clusterId: { type: string }
+        findingId: { type: string, description: "check id, e.g. KG-001" }
+        resource: { $ref: "#/components/schemas/ResourceRef" }
+        state: { type: string, enum: [open, acknowledged, in-progress, resolved, risk-accepted] }
+        assignee: { type: string }
+        waiver: { $ref: "#/components/schemas/Waiver" }
+        firstSeen: { type: string }
+        lastUpdated: { type: string }
+        resolvedAt: { type: string }
+    MTTRSummary:
+      type: object
+      required: [open, acknowledged, inProgress, resolved, riskAccepted, meanTimeToResolveHours]
+      properties:
+        open: { type: integer }
+        acknowledged: { type: integer }
+        inProgress: { type: integer }
+        resolved: { type: integer }
+        riskAccepted: { type: integer }
+        meanTimeToResolveHours: { type: number }
+    LifecycleView:
+      type: object
+      required: [items, mttr]
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/FindingLifecycle" } }
+        mttr: { $ref: "#/components/schemas/MTTRSummary" }
+    SetStateRequest:
+      type: object
+      required: [state]
+      properties:
+        state: { type: string, enum: [open, acknowledged, in-progress, resolved] }
+        assignee: { type: string }
+    CreateWaiverRequest:
+      type: object
+      required: [justification, expiresAt]
+      properties:
+        justification: { type: string }
+        expiresAt: { type: string, description: "RFC3339; capped at the server max waiver duration" }
     RegisterClusterRequest:
       type: object
       required: [id, source]

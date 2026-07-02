@@ -49,7 +49,7 @@ func newTestStore(t *testing.T) *Store {
 	}
 	// Clean slate.
 	if _, err := st.pool.Exec(context.Background(),
-		`TRUNCATE audit, history, scans, clusters, users, tenants`); err != nil {
+		`TRUNCATE finding_lifecycle, audit, history, scans, clusters, users, tenants`); err != nil {
 		t.Fatalf("truncate: %v", err)
 	}
 	t.Cleanup(st.Close)
@@ -166,6 +166,65 @@ func TestRetentionPrunesOldKeepsLatest(t *testing.T) {
 	}
 	if rep, ok := st.Report("acme", "prod-eu"); !ok || len(rep.Findings) != 2 {
 		t.Fatal("latest report must survive retention")
+	}
+}
+
+func TestPgFindingLifecycle(t *testing.T) {
+	st := newTestStore(t)
+	st.RegisterCluster("acme", dashboard.Cluster{ID: "prod-eu", Name: "prod-eu"})
+	rep := sample()
+	now := "2026-06-07T08:00:00Z"
+
+	// Seed is idempotent: two seeds create rows once, all open with first_seen.
+	st.SeedFindings("acme", "prod-eu", rep.Findings, now)
+	st.SeedFindings("acme", "prod-eu", rep.Findings, now)
+	rows := st.ListLifecycle("acme", "prod-eu")
+	if len(rows) != 2 {
+		t.Fatalf("want 2 seeded rows, got %d", len(rows))
+	}
+	for _, lc := range rows {
+		if lc.State != dashboard.StateOpen || lc.FirstSeen != now {
+			t.Fatalf("seeded row wrong: %+v", lc)
+		}
+	}
+
+	// Upsert a resolved state + a waiver round-trips through jsonb.
+	key := dashboard.LifecycleKey("prod-eu", rep.Findings[0])
+	lc, ok := st.GetLifecycle("acme", key)
+	if !ok {
+		t.Fatal("get seeded row")
+	}
+	lc.State = dashboard.StateResolved
+	lc.Assignee = "alice"
+	lc.ResolvedAt = "2026-06-07T18:00:00Z"
+	lc.LastUpdated = "2026-06-07T18:00:00Z"
+	st.UpsertLifecycle("acme", lc)
+
+	got, _ := st.GetLifecycle("acme", key)
+	if got.State != dashboard.StateResolved || got.Assignee != "alice" || got.ResolvedAt == "" {
+		t.Fatalf("resolved round-trip wrong: %+v", got)
+	}
+
+	// Waiver round-trips.
+	key2 := dashboard.LifecycleKey("prod-eu", rep.Findings[1])
+	lc2, _ := st.GetLifecycle("acme", key2)
+	lc2.State = dashboard.StateRiskAccepted
+	lc2.Waiver = &dashboard.Waiver{Justification: "compensating control", ApprovedBy: "ad", CreatedAt: now, ExpiresAt: "2026-07-01T00:00:00Z"}
+	st.UpsertLifecycle("acme", lc2)
+	got2, _ := st.GetLifecycle("acme", key2)
+	if got2.Waiver == nil || got2.Waiver.Justification != "compensating control" || got2.Waiver.ExpiresAt != "2026-07-01T00:00:00Z" {
+		t.Fatalf("waiver round-trip wrong: %+v", got2.Waiver)
+	}
+
+	// Tenant isolation.
+	if len(st.ListLifecycle("other", "")) != 0 {
+		t.Fatal("cross-tenant lifecycle leaked")
+	}
+
+	// DeleteCluster purges lifecycle rows.
+	st.DeleteCluster("acme", "prod-eu")
+	if len(st.ListLifecycle("acme", "prod-eu")) != 0 {
+		t.Fatal("DeleteCluster left lifecycle rows")
 	}
 }
 

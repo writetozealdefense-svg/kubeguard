@@ -39,6 +39,9 @@ type Config struct {
 	// size (P4); 0 = synchronous. QueueSize bounds the pending-scan queue.
 	AsyncWorkers int
 	QueueSize    int
+	// Lifecycle configures findings triage/waivers (K6). Zero value applies the
+	// conservative defaults: admin approval, 90-day max waiver.
+	Lifecycle LifecycleConfig
 	// Clock and NewID are injectable for deterministic tests (NFR-11). Defaults
 	// use the wall clock and a monotonic counter.
 	Clock func() time.Time
@@ -59,6 +62,7 @@ type API struct {
 	metrics   *Metrics
 	pool      *workerPool
 	clock     func() time.Time
+	life      LifecycleConfig
 
 	mu     sync.Mutex
 	nextID int
@@ -79,6 +83,7 @@ func New(cfg Config) *API {
 	}
 	a.audit = cfg.Audit
 	a.registrar = cfg.Registrar
+	a.life = cfg.Lifecycle.withDefaults()
 	a.brand = cfg.BrandTitle
 	a.sec = cfg.Security
 	if a.sec.MaxBodyBytes <= 0 {
@@ -190,6 +195,7 @@ func (a *API) routes() http.Handler {
 		r.With(a.requireRole(RoleAdmin, "audit.read")).Get("/audit", a.handleAudit)
 		r.Get("/report", a.handleReport)
 		r.Get("/stream", a.handleStream)
+		a.registerLifecycleRoutes(r) // findings lifecycle (K6)
 	})
 	return r
 }
@@ -348,6 +354,9 @@ func (a *API) runScanWithID(ctx context.Context, tenant, clusterID, subject, sca
 		return Scan{ID: scanID, ClusterID: clusterID, Status: ScanFailed}
 	}
 	scan := a.store.RecordScan(tenant, clusterID, scanID, rep, a.now())
+	// Seed lifecycle rows for newly-seen findings so time-to-resolve is measured
+	// from first detection (idempotent; existing triage state is untouched).
+	a.store.SeedFindings(tenant, clusterID, rep.Findings, a.now())
 	a.metrics.recordScan(clusterID, "success", a.clock().Sub(start), rep)
 	a.audit.Write(AuditEntry{At: a.now(), Subject: subject, Tenant: tenant, Action: "scan.trigger", Resource: clusterID, Result: "allowed"})
 	a.broker.Publish(tenant, Event{Type: "scan_completed", ClusterID: clusterID, ScanID: scanID, Progress: 1})

@@ -169,6 +169,54 @@ export type AuditEntry = z.infer<typeof AuditEntrySchema>;
 export const AuditListSchema = z.object({ entries: z.array(AuditEntrySchema) });
 export type AuditList = z.infer<typeof AuditListSchema>;
 
+// --- findings lifecycle (K6) ---
+export const FindingStateSchema = z.enum([
+  "open",
+  "acknowledged",
+  "in-progress",
+  "resolved",
+  "risk-accepted",
+]);
+export type FindingState = z.infer<typeof FindingStateSchema>;
+
+export const WaiverSchema = z.object({
+  justification: z.string(),
+  approvedBy: z.string(),
+  createdAt: z.string(),
+  expiresAt: z.string(),
+});
+export type Waiver = z.infer<typeof WaiverSchema>;
+
+export const FindingLifecycleSchema = z.object({
+  key: z.string(),
+  clusterId: z.string(),
+  findingId: z.string(),
+  resource: ResourceRefSchema,
+  state: FindingStateSchema,
+  assignee: z.string().optional(),
+  waiver: WaiverSchema.optional(),
+  firstSeen: z.string().optional(),
+  lastUpdated: z.string().optional(),
+  resolvedAt: z.string().optional(),
+});
+export type FindingLifecycle = z.infer<typeof FindingLifecycleSchema>;
+
+export const MTTRSummarySchema = z.object({
+  open: z.number(),
+  acknowledged: z.number(),
+  inProgress: z.number(),
+  resolved: z.number(),
+  riskAccepted: z.number(),
+  meanTimeToResolveHours: z.number(),
+});
+export type MTTRSummary = z.infer<typeof MTTRSummarySchema>;
+
+export const LifecycleViewSchema = z.object({
+  items: z.array(FindingLifecycleSchema),
+  mttr: MTTRSummarySchema,
+});
+export type LifecycleView = z.infer<typeof LifecycleViewSchema>;
+
 export const StreamEventSchema = z.object({
   type: z.enum(["scan_started", "scan_progress", "scan_completed", "posture_updated"]),
   clusterId: z.string().optional(),

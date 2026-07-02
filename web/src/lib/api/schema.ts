@@ -46,8 +46,32 @@ export interface paths {
         /** List clusters in the caller's tenant. */
         get: operations["listClusters"];
         put?: never;
-        post?: never;
+        /**
+         * Register a cluster and its scannable source at runtime (admin only).
+         * @description Adds a cluster to the caller's tenant and registers its scannable source (an offline manifest path or "live[:context]"). Requires the cluster.write permission (admin). Idempotent on the store; a rejected/malformed source is a 400 and leaves no cluster behind. Returns 501 when dynamic registration is not enabled on the server.
+         */
+        post: operations["registerCluster"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/clusters/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Deregister a cluster and drop its scans/history (admin only).
+         * @description Removes a cluster from the caller's tenant along with its scans and history, and deregisters its scannable source so subsequent scans 404. Requires the cluster.write permission (admin). Tenant-scoped.
+         */
+        delete: operations["deleteCluster"];
         options?: never;
         head?: never;
         patch?: never;
@@ -135,6 +159,107 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/lifecycle": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Findings triage lane — current findings overlaid with lifecycle state + MTTR.
+         * @description Returns each current finding overlaid with its stored lifecycle state (open/acknowledged/in-progress/resolved/risk-accepted), owner, and waiver, plus the MTTR/state-distribution summary. Waiver expiry is applied: a risk-accepted finding whose waiver has lapsed re-surfaces as open.
+         */
+        get: operations["listLifecycle"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/lifecycle/{key}/state": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Set a finding's triage state / assignee (analyst+).
+         * @description Sets the state to open, acknowledged, in-progress, or resolved and optionally assigns an owner. risk-accepted is NOT settable here — it is reached only by creating a waiver. Audited.
+         */
+        post: operations["setFindingState"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/lifecycle/{key}/waiver": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Accept risk with a time-boxed, justified waiver (admin only by default).
+         * @description Sets the finding to risk-accepted with a mandatory justification and an expiry (capped at the server's max waiver duration, 90 days by default). Requires the configured approver role (admin by default). Audited.
+         */
+        post: operations["createWaiver"];
+        /** Revoke a waiver so the finding re-opens (admin only by default). */
+        delete: operations["revokeWaiver"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/audit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Append-only privileged-action audit log (admin only, tenant-scoped).
+         * @description Returns the tenant's audit entries (allowed and denied privileged actions). Requires the admin role; analyst/viewer receive 403.
+         */
+        get: operations["listAudit"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export the latest report for a scope as SARIF, CSV, or PDF.
+         * @description Exports the most recent scan for the given cluster (or the merged fleet view when cluster is omitted). SARIF reuses the engine's validated 2.1.0 reporter; CSV is findings metadata (never secret values); PDF is a co-branded engagement report carrying the honest-metrics disclaimer.
+         */
+        get: operations["getReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/stream": {
         parameters: {
             query?: never;
@@ -159,6 +284,21 @@ export interface components {
         Error: {
             error: string;
         };
+        AuditEntry: {
+            /** @description RFC3339 timestamp */
+            at: string;
+            /** @description actor; "scheduler" for cron runs */
+            subject: string;
+            tenant: string;
+            /** @description e.g. scan.trigger, audit.read */
+            action: string;
+            resource?: string;
+            /** @enum {string} */
+            result: "allowed" | "denied";
+        };
+        AuditList: {
+            entries: components["schemas"]["AuditEntry"][];
+        };
         /** @enum {string} */
         Severity: "critical" | "high" | "medium" | "low" | "info";
         Cluster: {
@@ -171,6 +311,57 @@ export interface components {
         };
         ClusterList: {
             clusters: components["schemas"]["Cluster"][];
+        };
+        Waiver: {
+            justification: string;
+            approvedBy: string;
+            createdAt: string;
+            expiresAt: string;
+        };
+        FindingLifecycle: {
+            /** @description stable finding identity (hash of cluster+check+resource) */
+            key: string;
+            clusterId: string;
+            /** @description check id, e.g. KG-001 */
+            findingId: string;
+            resource: components["schemas"]["ResourceRef"];
+            /** @enum {string} */
+            state: "open" | "acknowledged" | "in-progress" | "resolved" | "risk-accepted";
+            assignee?: string;
+            waiver?: components["schemas"]["Waiver"];
+            firstSeen?: string;
+            lastUpdated?: string;
+            resolvedAt?: string;
+        };
+        MTTRSummary: {
+            open: number;
+            acknowledged: number;
+            inProgress: number;
+            resolved: number;
+            riskAccepted: number;
+            meanTimeToResolveHours: number;
+        };
+        LifecycleView: {
+            items: components["schemas"]["FindingLifecycle"][];
+            mttr: components["schemas"]["MTTRSummary"];
+        };
+        SetStateRequest: {
+            /** @enum {string} */
+            state: "open" | "acknowledged" | "in-progress" | "resolved";
+            assignee?: string;
+        };
+        CreateWaiverRequest: {
+            justification: string;
+            /** @description RFC3339; capped at the server max waiver duration */
+            expiresAt: string;
+        };
+        RegisterClusterRequest: {
+            /** @description cluster id (DNS-subdomain charset) */
+            id: string;
+            /** @description display name; defaults to id */
+            name?: string;
+            /** @description offline manifest path or "live[:context]" */
+            source: string;
         };
         Scan: {
             id: string;
@@ -252,6 +443,32 @@ export interface components {
         PostureResponse: {
             posture: components["schemas"]["PostureSummary"];
             compliance: components["schemas"]["FrameworkResult"][];
+            coverage?: components["schemas"]["CoverageBreakdown"];
+            topRisks?: components["schemas"]["RiskScore"][];
+        };
+        RiskFactor: {
+            name: string;
+            points: number;
+            detail: string;
+        };
+        /** @description Deterministic, explainable risk score for a finding. score = sum of the factors' points; the factors are the full "why" (see docs/honest-metrics.md). */
+        RiskScore: {
+            findingId: string;
+            title?: string;
+            severity: components["schemas"]["Severity"];
+            resource: components["schemas"]["ResourceRef"];
+            score: number;
+            factors: components["schemas"]["RiskFactor"][];
+        };
+        /** @description Assessment-coverage breakdown — how much of the discovered inventory the engine actually assessed. rate = assessable/discovered. */
+        CoverageBreakdown: {
+            discovered: number;
+            assessable: number;
+            skipped: number;
+            rate: number;
+            skippedByKind?: {
+                [key: string]: number;
+            };
         };
         PathHop: {
             order: number;
@@ -298,6 +515,24 @@ export interface components {
     responses: {
         /** @description insufficient role */
         Forbidden: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /** @description bad request */
+        Error: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /** @description not found */
+        NotFound: {
             headers: {
                 [name: string]: unknown;
             };
@@ -374,6 +609,56 @@ export interface operations {
                     "application/json": components["schemas"]["ClusterList"];
                 };
             };
+        };
+    };
+    registerCluster: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegisterClusterRequest"];
+            };
+        };
+        responses: {
+            /** @description registered */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Cluster"];
+                };
+            };
+            400: components["responses"]["Error"];
+            403: components["responses"]["Forbidden"];
+            501: components["responses"]["Error"];
+        };
+    };
+    deleteCluster: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            501: components["responses"]["Error"];
         };
     };
     listScans: {
@@ -518,6 +803,168 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HistoryList"];
+                };
+            };
+        };
+    };
+    listLifecycle: {
+        parameters: {
+            query?: {
+                /** @description cluster id; omit for the fleet view */
+                cluster?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description lifecycle view */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LifecycleView"];
+                };
+            };
+        };
+    };
+    setFindingState: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetStateRequest"];
+            };
+        };
+        responses: {
+            /** @description updated lifecycle row */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FindingLifecycle"];
+                };
+            };
+            400: components["responses"]["Error"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    createWaiver: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateWaiverRequest"];
+            };
+        };
+        responses: {
+            /** @description waived lifecycle row */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FindingLifecycle"];
+                };
+            };
+            400: components["responses"]["Error"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    revokeWaiver: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description re-opened lifecycle row */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FindingLifecycle"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listAudit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description audit entries */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditList"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    getReport: {
+        parameters: {
+            query?: {
+                /** @description cluster id; omit for the merged fleet view */
+                cluster?: string;
+                format?: "sarif" | "csv" | "pdf";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description report file (served as a Content-Disposition attachment) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/sarif+json": string;
+                    "text/csv": string;
+                    "application/pdf": string;
+                };
+            };
+            400: components["responses"]["Error"];
+            /** @description no scan for this scope yet */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
         };

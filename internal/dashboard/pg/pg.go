@@ -102,7 +102,7 @@ func (s *Store) RegisterCluster(tenant string, c dashboard.Cluster) {
 func (s *Store) DeleteCluster(tenant, clusterID string) bool {
 	ctx := context.Background()
 	// Remove dependent rows first (no cross-table FKs, so order is explicit).
-	for _, table := range []string{"history", "scans"} {
+	for _, table := range []string{"finding_lifecycle", "history", "scans"} {
 		if _, err := s.pool.Exec(ctx,
 			fmt.Sprintf("DELETE FROM %s WHERE tenant=$1 AND cluster_id=$2", table), tenant, clusterID); err != nil {
 			slog.Error("pg delete cluster deps", "table", table, "err", err)
@@ -365,7 +365,7 @@ func (s *Store) Retention(ctx context.Context, cutoffRFC3339 string) (int64, err
 
 // DeleteTenant hard-deletes all of a tenant's data (DPDP right-to-erasure).
 func (s *Store) DeleteTenant(ctx context.Context, tenant string) error {
-	for _, table := range []string{"audit", "history", "scans", "clusters", "users", "tenants"} {
+	for _, table := range []string{"finding_lifecycle", "audit", "history", "scans", "clusters", "users", "tenants"} {
 		col := "tenant"
 		if table == "tenants" {
 			col = "id"
@@ -377,7 +377,126 @@ func (s *Store) DeleteTenant(ctx context.Context, tenant string) error {
 	return nil
 }
 
-// --- helpers --------------------------------------------------------------
+// --- findings lifecycle (K6) ----------------------------------------------
+
+// SeedFindings inserts an open lifecycle row (first_seen=now) for any current
+// finding not yet tracked. Idempotent via ON CONFLICT DO NOTHING.
+func (s *Store) SeedFindings(tenant, clusterID string, findings []api.Finding, now string) {
+	ctx := context.Background()
+	for _, f := range findings {
+		key := dashboard.LifecycleKey(clusterID, f)
+		_, err := s.pool.Exec(ctx,
+			`INSERT INTO finding_lifecycle
+			   (tenant, key, cluster_id, finding_id, resource_kind, resource_namespace, resource_name, state, first_seen, last_updated)
+			 VALUES ($1,$2,$3,$4,$5,$6,$7,'open',$8,$8)
+			 ON CONFLICT (tenant, key) DO NOTHING`,
+			tenant, key, clusterID, f.ID,
+			nullStr(f.Resource.Kind), nullStr(f.Resource.Namespace), nullStr(f.Resource.Name), now)
+		if err != nil {
+			slog.Error("pg seed lifecycle", "err", err)
+			return
+		}
+	}
+}
+
+// GetLifecycle returns a lifecycle row by key.
+func (s *Store) GetLifecycle(tenant, key string) (dashboard.FindingLifecycle, bool) {
+	row := s.pool.QueryRow(context.Background(),
+		`SELECT key, cluster_id, finding_id, COALESCE(resource_kind,''), COALESCE(resource_namespace,''),
+		        COALESCE(resource_name,''), state, COALESCE(assignee,''), waiver,
+		        COALESCE(first_seen,''), COALESCE(last_updated,''), COALESCE(resolved_at,'')
+		 FROM finding_lifecycle WHERE tenant=$1 AND key=$2`, tenant, key)
+	lc, err := scanLifecycle(row)
+	if err != nil {
+		return dashboard.FindingLifecycle{}, false
+	}
+	return lc, true
+}
+
+// ListLifecycle returns a tenant's lifecycle rows, optionally filtered to one
+// cluster, in a stable order.
+func (s *Store) ListLifecycle(tenant, clusterID string) []dashboard.FindingLifecycle {
+	q := `SELECT key, cluster_id, finding_id, COALESCE(resource_kind,''), COALESCE(resource_namespace,''),
+	             COALESCE(resource_name,''), state, COALESCE(assignee,''), waiver,
+	             COALESCE(first_seen,''), COALESCE(last_updated,''), COALESCE(resolved_at,'')
+	      FROM finding_lifecycle WHERE tenant=$1`
+	args := []any{tenant}
+	if clusterID != "" {
+		q += ` AND cluster_id=$2`
+		args = append(args, clusterID)
+	}
+	q += ` ORDER BY finding_id, key`
+	rows, err := s.pool.Query(context.Background(), q, args...)
+	if err != nil {
+		slog.Error("pg list lifecycle", "err", err)
+		return []dashboard.FindingLifecycle{}
+	}
+	defer rows.Close()
+	out := []dashboard.FindingLifecycle{}
+	for rows.Next() {
+		lc, err := scanLifecycle(rows)
+		if err != nil {
+			slog.Error("pg scan lifecycle", "err", err)
+			continue
+		}
+		out = append(out, lc)
+	}
+	return out
+}
+
+// UpsertLifecycle persists a lifecycle row (create or replace).
+func (s *Store) UpsertLifecycle(tenant string, lc dashboard.FindingLifecycle) {
+	var waiverJSON any
+	if lc.Waiver != nil {
+		b, err := json.Marshal(lc.Waiver)
+		if err != nil {
+			slog.Error("pg marshal waiver", "err", err)
+			return
+		}
+		waiverJSON = string(b)
+	}
+	_, err := s.pool.Exec(context.Background(),
+		`INSERT INTO finding_lifecycle
+		   (tenant, key, cluster_id, finding_id, resource_kind, resource_namespace, resource_name,
+		    state, assignee, waiver, first_seen, last_updated, resolved_at)
+		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+		 ON CONFLICT (tenant, key) DO UPDATE SET
+		   cluster_id=EXCLUDED.cluster_id, finding_id=EXCLUDED.finding_id,
+		   resource_kind=EXCLUDED.resource_kind, resource_namespace=EXCLUDED.resource_namespace,
+		   resource_name=EXCLUDED.resource_name, state=EXCLUDED.state, assignee=EXCLUDED.assignee,
+		   waiver=EXCLUDED.waiver, first_seen=EXCLUDED.first_seen, last_updated=EXCLUDED.last_updated,
+		   resolved_at=EXCLUDED.resolved_at`,
+		tenant, lc.Key, lc.ClusterID, lc.FindingID,
+		nullStr(lc.Resource.Kind), nullStr(lc.Resource.Namespace), nullStr(lc.Resource.Name),
+		string(lc.State), nullStr(lc.Assignee), waiverJSON,
+		nullStr(lc.FirstSeen), nullStr(lc.LastUpdated), nullStr(lc.ResolvedAt))
+	if err != nil {
+		slog.Error("pg upsert lifecycle", "err", err)
+	}
+}
+
+// scanLifecycle decodes a lifecycle row from a pgx row/rows scanner.
+func scanLifecycle(sc interface{ Scan(...any) error }) (dashboard.FindingLifecycle, error) {
+	var (
+		lc         dashboard.FindingLifecycle
+		state      string
+		waiverJSON []byte
+	)
+	if err := sc.Scan(&lc.Key, &lc.ClusterID, &lc.FindingID,
+		&lc.Resource.Kind, &lc.Resource.Namespace, &lc.Resource.Name,
+		&state, &lc.Assignee, &waiverJSON,
+		&lc.FirstSeen, &lc.LastUpdated, &lc.ResolvedAt); err != nil {
+		return dashboard.FindingLifecycle{}, err
+	}
+	lc.State = dashboard.FindingState(state)
+	if len(waiverJSON) > 0 {
+		var w dashboard.Waiver
+		if err := json.Unmarshal(waiverJSON, &w); err == nil {
+			lc.Waiver = &w
+		}
+	}
+	return lc, nil
+}
 
 func postureControls(rep api.Report) (assessed, breached int) {
 	if rep.Posture.ControlsAssessed > 0 {

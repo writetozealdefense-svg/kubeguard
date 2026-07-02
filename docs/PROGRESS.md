@@ -83,6 +83,40 @@ had none). Results:
   findings, reproducibility, factor-sum == score (no hidden term), and the
   breadth bonus. risk pkg coverage 87.5%. Full gate green; goldens unchanged.
 
+## KSPM K6 — Findings lifecycle, ownership, waivers, MTTR (done — the biggest gap)
+
+- **[NEW] Lifecycle model** (`internal/dashboard/lifecycle.go`): states
+  open/acknowledged/in-progress/resolved/risk-accepted keyed by a stable
+  `LifecycleKey` (hash of cluster+check+resource) so state persists across scans;
+  ownership/assignee; `Waiver{justification, approvedBy, createdAt, expiresAt}`
+  with `Active(now)`; `EffectiveState`/`IsActivelyWaived` (expiry auto-lapses and
+  the finding re-surfaces); `ComputeMTTR` (counts by effective state + mean
+  resolvedAt−firstSeen, honestly excluding rows missing timestamps).
+- **[NEW] Store**: `SeedFindings`/`GetLifecycle`/`ListLifecycle`/`UpsertLifecycle`
+  on the `Store` interface + MemStore + pg (migration `0002_finding_lifecycle`,
+  waiver as jsonb). DeleteCluster and DPDP DeleteTenant cascade to lifecycle rows.
+  RunScan seeds firstSeen at first detection.
+- **[NEW] API** (waiver-aware, audited): `GET /v1/lifecycle` (triage lane + MTTR,
+  waiver expiry applied), `POST /v1/lifecycle/{key}/state` (analyst+),
+  `POST /v1/lifecycle/{key}/waiver` (admin, justification required, 90-day cap),
+  `DELETE …/waiver` (admin). Every change + denial audited. OpenAPI paths +
+  schemas added; spec still validates.
+- **[NEW] Waiver-aware enforcement primitives**: `API.WaivedKeys` and
+  `dashboard.BlockingFindings` partition blocking vs waived-but-logged findings —
+  consumed by K7 guardrails.
+- **[NEW] Dashboard Triage view** (`web/src/routes/Triage.tsx`): MTTR tiles,
+  role-gated state controls, admin Accept-risk dialog (mandatory justification +
+  expiry), waiver display; client methods + zod types + mock; nav + route.
+- ⟐ DECISION: waiver approver = RoleAdmin, max duration = 90 days, both
+  configurable via `LifecycleConfig`.
+- **Acceptance:** `internal/dashboard/lifecycle_test.go` (seed→open, triage+MTTR,
+  analyst-can't/admin-can waive, expiry re-surfaces, validation, revoke, complete
+  audit trail, BlockingFindings partition); `pg_test.go TestPgFindingLifecycle`
+  runs green against **real Postgres** (seed idempotent, state+waiver jsonb
+  round-trip, tenant isolation, DeleteCluster cascade). Web: 4 Triage tests
+  (render+MTTR, viewer read-only, analyst sets state, admin Accept-risk). Full
+  gate green (Go build/vet/lint/test; web build/lint/51 tests); goldens unchanged.
+
 | Squad | Status | Notes |
 |---|---|---|
 | A — Scaffold | ✅ done | module, §13 layout, cobra + `version`, slog, `.golangci.yml`, CI matrix, 3 golden fixtures |

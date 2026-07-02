@@ -11,15 +11,20 @@ import {
   AuditListSchema,
   ClusterListSchema,
   FindingPageSchema,
+  FindingLifecycleSchema,
   HistoryListSchema,
+  LifecycleViewSchema,
   PostureResponseSchema,
   ScanListSchema,
   ScanSchema,
   type AttackPathList,
   type AuditList,
   type ClusterList,
+  type FindingLifecycle,
   type FindingPage,
+  type FindingState,
   type HistoryList,
+  type LifecycleView,
   type PostureResponse,
   type Scan,
   type ScanList,
@@ -139,6 +144,44 @@ export class ApiClient {
 
   getAudit(): Promise<AuditList> {
     return this.get("/v1/audit", AuditListSchema);
+  }
+
+  // --- findings lifecycle (K6) ---
+
+  getLifecycle(cluster?: string): Promise<LifecycleView> {
+    return this.get(`/v1/lifecycle${this.qs({ cluster })}`, LifecycleViewSchema);
+  }
+
+  private async post<T>(path: string, body: unknown, schema: z.ZodType<T>, method = "POST"): Promise<T> {
+    const token = this.tokenProvider();
+    const res = await this.transport(path, {
+      method,
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      throw new ApiError(res.status, text || res.statusText);
+    }
+    return schema.parse(await res.json());
+  }
+
+  /** Set a finding's triage state / assignee (analyst+). */
+  setFindingState(key: string, state: Exclude<FindingState, "risk-accepted">, assignee?: string): Promise<FindingLifecycle> {
+    return this.post(`/v1/lifecycle/${encodeURIComponent(key)}/state`, { state, assignee }, FindingLifecycleSchema);
+  }
+
+  /** Accept risk with a justified, time-boxed waiver (admin by default). */
+  createWaiver(key: string, justification: string, expiresAt: string): Promise<FindingLifecycle> {
+    return this.post(`/v1/lifecycle/${encodeURIComponent(key)}/waiver`, { justification, expiresAt }, FindingLifecycleSchema);
+  }
+
+  /** Revoke a waiver so the finding re-opens (admin by default). */
+  revokeWaiver(key: string): Promise<FindingLifecycle> {
+    return this.post(`/v1/lifecycle/${encodeURIComponent(key)}/waiver`, undefined, FindingLifecycleSchema, "DELETE");
   }
 
   /** Download an export (sarif | csv | pdf) for a cluster as a blob, carrying

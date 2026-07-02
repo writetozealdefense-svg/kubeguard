@@ -25,11 +25,17 @@ type tenantState struct {
 type MemStore struct {
 	mu      sync.RWMutex
 	tenants map[string]*tenantState
+	// lifecycle[tenant][key] holds finding triage state, keyed by the stable
+	// LifecycleKey so it survives scans coming and going.
+	lifecycle map[string]map[string]FindingLifecycle
 }
 
 // NewMemStore builds an empty in-memory store.
 func NewMemStore() *MemStore {
-	return &MemStore{tenants: map[string]*tenantState{}}
+	return &MemStore{
+		tenants:   map[string]*tenantState{},
+		lifecycle: map[string]map[string]FindingLifecycle{},
+	}
 }
 
 func (m *MemStore) tenant(t string) *tenantState {
@@ -70,6 +76,12 @@ func (m *MemStore) DeleteCluster(tenant, clusterID string) bool {
 		if id == clusterID {
 			ts.order = append(ts.order[:i], ts.order[i+1:]...)
 			break
+		}
+	}
+	// Drop the cluster's lifecycle rows too.
+	for key, lc := range m.lifecycle[tenant] {
+		if lc.ClusterID == clusterID {
+			delete(m.lifecycle[tenant], key)
 		}
 	}
 	return true
@@ -220,6 +232,66 @@ func (m *MemStore) History(tenant, clusterID string) []HistorySnapshot {
 		out = []HistorySnapshot{}
 	}
 	return out
+}
+
+// --- findings lifecycle (K6) ---
+
+// SeedFindings creates an open lifecycle row (FirstSeen=now) for any current
+// finding not yet tracked. Idempotent — existing rows are untouched.
+func (m *MemStore) SeedFindings(tenant, clusterID string, findings []api.Finding, now string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	byKey := m.lifecycle[tenant]
+	if byKey == nil {
+		byKey = map[string]FindingLifecycle{}
+		m.lifecycle[tenant] = byKey
+	}
+	for _, f := range findings {
+		key := LifecycleKey(clusterID, f)
+		if _, ok := byKey[key]; ok {
+			continue
+		}
+		byKey[key] = FindingLifecycle{
+			Key: key, ClusterID: clusterID, FindingID: f.ID, Resource: f.Resource,
+			State: StateOpen, FirstSeen: now, LastUpdated: now,
+		}
+	}
+}
+
+// GetLifecycle returns a lifecycle row by key.
+func (m *MemStore) GetLifecycle(tenant, key string) (FindingLifecycle, bool) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	lc, ok := m.lifecycle[tenant][key]
+	return lc, ok
+}
+
+// ListLifecycle returns a tenant's lifecycle rows, optionally filtered to one
+// cluster, in a stable order.
+func (m *MemStore) ListLifecycle(tenant, clusterID string) []FindingLifecycle {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	out := []FindingLifecycle{}
+	for _, lc := range m.lifecycle[tenant] {
+		if clusterID != "" && lc.ClusterID != clusterID {
+			continue
+		}
+		out = append(out, lc)
+	}
+	sortLifecycle(out)
+	return out
+}
+
+// UpsertLifecycle persists a lifecycle row (create or replace).
+func (m *MemStore) UpsertLifecycle(tenant string, lc FindingLifecycle) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	byKey := m.lifecycle[tenant]
+	if byKey == nil {
+		byKey = map[string]FindingLifecycle{}
+		m.lifecycle[tenant] = byKey
+	}
+	byKey[lc.Key] = lc
 }
 
 // MergeReports combines per-cluster reports into one tenant-wide fleet report:

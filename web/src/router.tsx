@@ -10,6 +10,7 @@ import { Overview } from "@/routes/Overview";
 import { Login } from "@/routes/Login";
 import { AuthCallback } from "@/routes/AuthCallback";
 import { Findings } from "@/routes/Findings";
+import { Triage } from "@/routes/Triage";
 import { Compliance } from "@/routes/Compliance";
 import { AttackPaths } from "@/routes/AttackPaths";
 import { Clusters } from "@/routes/Clusters";
@@ -21,6 +22,7 @@ const rootRoute = createRootRoute({ component: Shell });
 
 const indexRoute = createRoute({ getParentRoute: () => rootRoute, path: "/", component: Overview });
 const findingsRoute = createRoute({ getParentRoute: () => rootRoute, path: "/findings", component: Findings });
+const triageRoute = createRoute({ getParentRoute: () => rootRoute, path: "/triage", component: Triage });
 const complianceRoute = createRoute({ getParentRoute: () => rootRoute, path: "/compliance", component: Compliance });
 const attackPathsRoute = createRoute({ getParentRoute: () => rootRoute, path: "/attack-paths", component: AttackPaths });
 const clustersRoute = createRoute({ getParentRoute: () => rootRoute, path: "/clusters", component: Clusters });
@@ -33,6 +35,7 @@ const callbackRoute = createRoute({ getParentRoute: () => rootRoute, path: "/aut
 const routeTree = rootRoute.addChildren([
   indexRoute,
   findingsRoute,
+  triageRoute,
   complianceRoute,
   attackPathsRoute,
   clustersRoute,

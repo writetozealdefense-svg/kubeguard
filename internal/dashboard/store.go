@@ -100,4 +100,17 @@ type Store interface {
 	// clusters in the tenant when clusterID is "".
 	Report(tenant, clusterID string) (api.Report, bool)
 	History(tenant, clusterID string) []HistorySnapshot
+
+	// --- findings lifecycle (K6) ---
+	// SeedFindings idempotently creates an open lifecycle row (with FirstSeen set
+	// to now) for any current finding not yet tracked, so time-to-resolve is
+	// measured from first detection. Existing rows are left untouched.
+	SeedFindings(tenant, clusterID string, findings []api.Finding, now string)
+	// GetLifecycle returns a finding's lifecycle row by key.
+	GetLifecycle(tenant, key string) (FindingLifecycle, bool)
+	// ListLifecycle returns a tenant's lifecycle rows, optionally filtered to one
+	// cluster.
+	ListLifecycle(tenant, clusterID string) []FindingLifecycle
+	// UpsertLifecycle persists a lifecycle row (create or replace).
+	UpsertLifecycle(tenant string, lc FindingLifecycle)
 }
