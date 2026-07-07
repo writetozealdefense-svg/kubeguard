@@ -1,0 +1,18 @@
+# Example offline waiver file (K7). Actively-waived findings do not trip
+# --fail-on (or the admission webhook), but each application is logged so a
+# suppression is never silent. Justification and expires are mandatory; an
+# expired waiver stops applying and the finding re-blocks.
+#
+#   kubeguard scan -i manifests/ --fail-on high --waivers waivers.yaml
+#   kubeguard webhook --waivers /etc/kubeguard/waivers.yaml
+#
+# A waiver with no `resource:` selector covers the check on every resource; add a
+# selector (any field is a wildcard) to scope it to specific workloads.
+waivers:
+  - id: KG-001
+    resource: { kind: Deployment, namespace: payments, name: checkout }
+    justification: "Legacy sidecar needs CAP_SYS_ADMIN; migration tracked in JIRA-1234."
+    expires: "2026-12-31T00:00:00Z"
+  - id: KG-011
+    justification: "checkout-sa cluster-admin is a temporary break-glass; removal in Q4."
+    expires: "2026-12-31T00:00:00Z"

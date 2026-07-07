@@ -15,6 +15,7 @@ import (
 	"github.com/kubeguard/kubeguard/internal/loader/offline"
 	"github.com/kubeguard/kubeguard/internal/model"
 	"github.com/kubeguard/kubeguard/internal/report"
+	"github.com/kubeguard/kubeguard/internal/waiver"
 	"github.com/kubeguard/kubeguard/pkg/api"
 	"github.com/spf13/cobra"
 )
@@ -30,6 +31,7 @@ type scanParams struct {
 	watch        bool
 	live         bool
 	kubeContext  string
+	waiversPath  string
 }
 
 func newScanCmd() *cobra.Command {
@@ -51,11 +53,12 @@ func newScanCmd() *cobra.Command {
 	}
 	f := cmd.Flags()
 	f.StringVarP(&p.input, "input", "i", "", "path to a manifest file, directory, or snapshot (required)")
-	f.StringVarP(&p.format, "format", "f", "console", "output format: console|json|sarif|asff|html|evidence")
+	f.StringVarP(&p.format, "format", "f", "console", "output format: console|json|sarif|asff|html|evidence|gitops")
 	f.StringVarP(&p.profileName, "profile", "p", "zeal-default", "check profile: cis|zeal-default")
 	f.StringVarP(&p.output, "output", "o", "", "write output to a file instead of stdout")
 	f.BoolVar(&p.assumeBreach, "assume-breach", false, "seed every workload as reachable from an in-cluster foothold")
 	f.StringVar(&p.failOn, "fail-on", "", "exit non-zero if any finding is at or above this severity: critical|high|medium|low")
+	f.StringVar(&p.waiversPath, "waivers", "", "offline waiver file (YAML/JSON); actively-waived findings don't trip --fail-on but are logged")
 	f.StringVar(&p.historyPath, "history", "", "append this scan to a history store (.sqlite/.db/.kgdb → SQLite, else JSONL)")
 	f.BoolVar(&p.watch, "watch", false, "re-scan when the input changes")
 	f.BoolVar(&p.live, "live", false, "scan a live cluster read-only via kubeconfig instead of files")
@@ -104,6 +107,17 @@ func runScan(cmd *cobra.Command, p scanParams) error {
 	rep.Source = source
 	findings := rep.Findings
 
+	// Waiver-aware gating (K7): actively-waived findings still appear in the
+	// report (transparency) but are excluded from the --fail-on gate. Every
+	// applied waiver is logged so a suppression is never silent.
+	var waiverSet *waiver.Set
+	if p.waiversPath != "" {
+		waiverSet, err = waiver.Load(p.waiversPath)
+		if err != nil {
+			return err
+		}
+	}
+
 	var hist []history.Record
 	if p.historyPath != "" {
 		store, err := history.Open(p.historyPath)
@@ -147,11 +161,28 @@ func runScan(cmd *cobra.Command, p scanParams) error {
 		if err != nil {
 			return err
 		}
-		if n := countAtOrAbove(findings, thr); n > 0 {
+		blocking := findings
+		if !waiverSet.Empty() {
+			var waived []waiver.WaivedFinding
+			blocking, waived = waiverSet.Partition(findings, time.Now().UTC())
+			for _, wf := range waived {
+				_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "waived: %s %s (%s %s) until %s — %s\n",
+					wf.Finding.ID, wf.Finding.Title, wf.Finding.Resource.Kind, resourceLoc(wf.Finding.Resource),
+					wf.Entry.Expires, wf.Entry.Justification)
+			}
+		}
+		if n := countAtOrAbove(blocking, thr); n > 0 {
 			return gateBreach(thr, n)
 		}
 	}
 	return nil
+}
+
+func resourceLoc(r api.ResourceRef) string {
+	if r.Namespace != "" {
+		return r.Namespace + "/" + r.Name
+	}
+	return r.Name
 }
 
 func render(out io.Writer, format string, rep api.Report, hist []history.Record, color bool) error {
@@ -164,10 +195,12 @@ func render(out io.Writer, format string, rep api.Report, hist []history.Record,
 		return report.ASFF(out, rep)
 	case "html":
 		return report.HTML(out, rep, hist)
+	case "gitops":
+		return report.GitOpsAnnotations(out, rep)
 	case "console", "":
 		return report.Console(out, rep, color)
 	default:
-		return fmt.Errorf("unknown format %q (want console|json|sarif|asff|html|evidence)", format)
+		return fmt.Errorf("unknown format %q (want console|json|sarif|asff|html|evidence|gitops)", format)
 	}
 }
 

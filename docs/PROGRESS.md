@@ -117,6 +117,34 @@ had none). Results:
   (render+MTTR, viewer read-only, analyst sets state, admin Accept-risk). Full
   gate green (Go build/vet/lint/test; web build/lint/51 tests); goldens unchanged.
 
+## KSPM K7 — Waiver-aware guardrails + PR/GitOps mode + shift-left docs (done)
+
+- **[NEW] Offline waiver mechanism** (`internal/waiver`): the offline peer of the
+  K6 store-backed waivers — an operator-supplied YAML/JSON file so guardrails with
+  no store (CI runner, air-gapped admission controller) honor a valid, unexpired
+  risk acceptance. Strict load (unknown keys rejected; justification + RFC3339
+  expiry mandatory); `Match`/`Partition` are pure functions of finding + now;
+  expired waivers stop applying (finding re-blocks); resource selector with
+  wildcard fields.
+- **[EXTEND] Waiver-aware `--fail-on`**: `scan --waivers <file>` excludes
+  actively-waived findings from the gate but logs each (`waived: …` on stderr);
+  the finding still appears in the report.
+- **[EXTEND] Waiver-aware admission webhook**: `webhook --waivers <file>` admits a
+  pod whose violations are all waived, surfacing each as an admission **warning**;
+  an unwaived or expired violation still denies with the offending check ids.
+- **[NEW] PR/GitOps mode**: `scan -f gitops` emits GitHub Actions workflow-command
+  annotations (severity→error/warning/notice) + a summary notice for inline PR
+  checks. Complements SARIF code-scanning.
+- **[DOC] `docs/shift-left.md`**: pre-commit → CI (SARIF + PR gate) → admission as
+  one policy story with shared engine/profile/waivers.
+- **Acceptance:** `internal/waiver/waiver_test.go`, `internal/webhook/waiver_test.go`
+  (waived admits with warning, expired still denies, partial waiver denies the
+  unwaived), `internal/cli/waiver_gate_test.go` (waived criticals pass --fail-on,
+  expired still trips, malformed rejected, gitops annotations). Full gate green;
+  goldens unchanged. Example `test/fixtures/waivers.example.yaml`.
+- Local-env note: Go build/lint caches moved to D: (`GOCACHE`/`GOTMPDIR`/
+  `GOLANGCI_LINT_CACHE`) because C: filled during a build — no repo impact.
+
 | Squad | Status | Notes |
 |---|---|---|
 | A — Scaffold | ✅ done | module, §13 layout, cobra + `version`, slog, `.golangci.yml`, CI matrix, 3 golden fixtures |
