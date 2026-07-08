@@ -270,6 +270,81 @@ func (m mutableImageCheck) Run(g *graph.Graph) []api.Finding {
 	return out
 }
 
+type capDropAllCheck struct{}
+
+func (capDropAllCheck) Meta() Meta {
+	return Meta{
+		ID: "KG-021", Title: "Container does not drop all capabilities", Severity: api.SeverityMedium,
+		Category: catWorkload,
+		Refs:     []api.ControlRef{cis("5.2.9"), nsa("Pod security"), {Framework: "PSA", ID: "restricted"}},
+		Remediation: "Set securityContext.capabilities.drop: [\"ALL\"] and add back only the " +
+			"capabilities the workload strictly requires (Pod Security \"restricted\").",
+	}
+}
+
+func (m capDropAllCheck) Run(g *graph.Graph) []api.Finding {
+	var out []api.Finding
+	for _, w := range g.Workloads {
+		for _, c := range w.PodSpec.Containers {
+			if !dropsAll(c.CapsDrop) {
+				out = append(out, m.Meta().finding(ref(w.Resource), ev(cpath(c, "securityContext.capabilities.drop"), "does not drop ALL")))
+			}
+		}
+	}
+	return out
+}
+
+// dropsAll reports whether the container drops all capabilities (case-insensitive
+// "ALL" present in the drop list) — the Pod Security "restricted" requirement.
+func dropsAll(drop []string) bool {
+	for _, d := range drop {
+		if strings.EqualFold(d, "ALL") {
+			return true
+		}
+	}
+	return false
+}
+
+type untrustedRegistryCheck struct{}
+
+func (untrustedRegistryCheck) Meta() Meta {
+	return Meta{
+		ID: "KG-022", Title: "Image pulled from an implicit or untrusted registry", Severity: api.SeverityLow,
+		Category: catSupplyChain,
+		Refs:     []api.ControlRef{nsa("Supply chain")},
+		Remediation: "Pull images from an explicit, trusted registry (e.g. registry.example.com/…) " +
+			"rather than an implicit Docker Hub reference, and enforce it with an admission policy.",
+	}
+}
+
+func (m untrustedRegistryCheck) Run(g *graph.Graph) []api.Finding {
+	var out []api.Finding
+	for _, w := range g.Workloads {
+		for _, c := range w.PodSpec.Containers {
+			if implicitRegistry(c.Image) {
+				out = append(out, m.Meta().finding(ref(w.Resource), ev(cpath(c, "image"), c.Image)))
+			}
+		}
+	}
+	return out
+}
+
+// implicitRegistry reports whether an image reference names no explicit registry
+// host (so it resolves to Docker Hub). The first path segment is a registry host
+// only when it contains a "." or ":" (port) or is "localhost"; otherwise the
+// image is an implicit docker.io reference.
+func implicitRegistry(image string) bool {
+	if image == "" {
+		return false
+	}
+	i := strings.Index(image, "/")
+	if i < 0 {
+		return true // no "/" at all → bare docker.io library image (e.g. "nginx:1")
+	}
+	first := image[:i]
+	return !strings.Contains(first, ".") && !strings.Contains(first, ":") && first != "localhost"
+}
+
 type seccompCheck struct{}
 
 func (seccompCheck) Meta() Meta {

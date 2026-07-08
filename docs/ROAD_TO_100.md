@@ -167,6 +167,7 @@ launch but sign-off gates the "fully audited" claim.
 
 **🟡 Important**
 
+- [x] Detection breadth (K2) — *audited 20 checks vs CIS/NSA; added KG-021 (drop-ALL caps / PSA-restricted) + KG-022 (implicit/untrusted registry); vulnerable 19→21, hardened+bundle stay 0; K2b offline-CVE skipped+flagged*
 - [x] Risk prioritization (K4) — *deterministic explainable score in internal/risk; top risks on CLI/posture/report; weights in docs/honest-metrics.md; chain enablers rank first*
 - [x] Findings lifecycle & waivers (K6) — *states/ownership/waivers with expiry + auto-lapse, MTTR, audited, waiver-aware enforcement primitives; mem+pg (migration 0002) tested; dashboard Triage lane; docs/findings-lifecycle.md*
 - [x] Waiver-aware guardrails + shift-left (K7) — *internal/waiver offline waiver file; --fail-on and admission webhook honor+log active waivers (expired re-block); scan -f gitops PR annotations; docs/shift-left.md*

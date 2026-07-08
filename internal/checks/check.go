@@ -98,13 +98,14 @@ func nsa(title string) api.ControlRef {
 }
 func attack(id string) api.ControlRef { return api.ControlRef{Framework: "ATT&CK", ID: id} }
 
-// Registry returns all 20 built-in checks in id order.
+// Registry returns all built-in checks in id order.
 func Registry() []Check {
 	return []Check{
 		privilegedCheck{}, hostPathCheck{}, hostNetworkCheck{}, hostPIDCheck{}, hostIPCCheck{},
 		runAsRootCheck{}, allowPrivEscCheck{}, dangerousCapsCheck{}, readOnlyRootFSCheck{}, resourceLimitsCheck{},
 		clusterAdminBindingCheck{}, wildcardRBACCheck{}, secretsAccessCheck{}, podCreateCheck{}, automountTokenCheck{},
 		defaultSACheck{}, networkPolicyCheck{}, exposureCheck{}, mutableImageCheck{}, seccompCheck{},
+		capDropAllCheck{}, untrustedRegistryCheck{},
 	}
 }
 

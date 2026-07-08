@@ -188,6 +188,34 @@ had none). Results:
   Postgres earlier and migration 0003 is a trivial ADD COLUMN. SARIF schema test
   passes. Full offline gate green (build/vet/lint/test); goldens unchanged.
 
+## KSPM K2 — Detection breadth: +2 CIS/NSA checks (done)
+
+- **[EXTEND]** Audited the 20 checks vs CIS Kubernetes Benchmark + NSA/CISA
+  hardening guide. Most brief-listed gaps were **already covered** (hostPID/IPC/
+  Network KG-003/004/005, dangerous caps KG-008, automount KG-015, missing limits
+  KG-010, seccomp KG-020, mutable tag KG-019, PSA host-access via the deny-set).
+  Added two genuinely missing, high-value checks:
+  - **KG-021 — Container does not drop all capabilities** (medium,
+    workload-hardening; CIS 5.2.9 / NSA / PSA "restricted"). Fires when a
+    container lacks `capabilities.drop: [ALL]`.
+  - **KG-022 — Image from an implicit/untrusted registry** (low, supply-chain;
+    NSA "Supply chain"). Fires on an implicit docker.io reference (no explicit
+    registry host); deterministic and offline (no allowlist config needed).
+- Both **fire on `vulnerable.yaml`** and are **silent on `hardened.yaml`** and the
+  **`harden` bundle** (which drops ALL + uses an explicit registry) — so the
+  `hardened → 0` and `bundle → 0` invariants hold. Vulnerable: 19 → **21**
+  findings (critical stays 4; +1 medium, +1 low).
+- **⟐ K2b (offline image-CVE correlation): SKIPPED and flagged.** Config-level
+  image posture (KG-019/022) is the KSPM-safe default; an offline vuln-DB
+  correlation sits on the CWPP boundary and needs an operator-supplied offline DB
+  — deferred as an optional, clearly-labelled extension per the brief.
+- **Acceptance:** ±/− cases added for KG-021/022; registry test 20 → **22**;
+  `cleanWorkload` image given an explicit registry host so it stays check-clean;
+  `vulnerable.findings.json` golden **regenerated** (justified above); SARIF still
+  conforms to the 2.1.0 schema with the new checks. Compliance/attack/evidence
+  goldens **unchanged** (new checks map to no pack control and grant no attack
+  primitive). Full gate green.
+
 | Squad | Status | Notes |
 |---|---|---|
 | A — Scaffold | ✅ done | module, §13 layout, cobra + `version`, slog, `.golangci.yml`, CI matrix, 3 golden fixtures |

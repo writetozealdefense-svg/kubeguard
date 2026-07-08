@@ -263,7 +263,7 @@ Checks self-register into a registry. **Profiles** select/override the active se
 
 A profile is data (`{include:[], exclude:[], severityOverrides:{}}`), not code.
 
-### 7.3 The 20 built-in checks
+### 7.3 The built-in checks (22)
 
 Each finding carries **severity, evidence, remediation, grants (§8.1 primitives), and refs**
 (CIS section and/or NSA/CISA Kubernetes Hardening Guide, plus ATT&CK where a check directly
@@ -291,6 +291,8 @@ enables a technique). Severities below are `zeal-default`.
 | KG-018 | Service exposed via LoadBalancer/NodePort | medium (NodePort) / high (LoadBalancer fronting a vulnerable workload) | exposure | `InternetIngress` | NSA; ATT&CK T1190 |
 | KG-019 | Image uses mutable tag (`:latest` / no digest) | low | supply-chain | — | CIS 5.x; NSA |
 | KG-020 | Seccomp profile not RuntimeDefault | low | workload-hardening | — | CIS 5.2.x; NSA; PSA "restricted" |
+| KG-021 | Container does not drop all capabilities (`drop: [ALL]`) | medium | workload-hardening | — | CIS 5.2.9; NSA "Pod security"; PSA "restricted" |
+| KG-022 | Image pulled from an implicit/untrusted registry (implicit docker.io) | low | supply-chain | — | NSA "Supply chain" |
 
 > Severity of KG-018 is computed: `high` when the selected workload also carries a host-access or
 > RBAC-escalation finding (i.e. the LB fronts a dangerous pod), else `medium`. This is what lifts

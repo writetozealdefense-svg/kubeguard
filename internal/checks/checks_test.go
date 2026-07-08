@@ -32,7 +32,7 @@ func cleanWorkload() model.Workload {
 			AutomountSAToken: fls(),
 			Containers: []model.ContainerView{{
 				Name:           "c",
-				Image:          "reg/app:1.0@sha256:" + strings.Repeat("a", 64),
+				Image:          "reg.example.com/app:1.0@sha256:" + strings.Repeat("a", 64),
 				AllowPrivEsc:   fls(),
 				RunAsNonRoot:   tru(),
 				RunAsUser:      i64(1000),
@@ -108,6 +108,8 @@ func TestEachCheckPositiveAndNegative(t *testing.T) {
 		{"KG-016", mutate(func(w *model.Workload) { w.ServiceAccountName = "default" }), gw(cleanWorkload())},
 		{"KG-019", mutate(func(w *model.Workload) { w.PodSpec.Containers[0].Image = "app:latest" }), gw(cleanWorkload())},
 		{"KG-020", mutate(func(w *model.Workload) { w.PodSpec.Containers[0].SeccompProfile = "" }), gw(cleanWorkload())},
+		{"KG-021", mutate(func(w *model.Workload) { w.PodSpec.Containers[0].CapsDrop = nil }), gw(cleanWorkload())},
+		{"KG-022", mutate(func(w *model.Workload) { w.PodSpec.Containers[0].Image = "app:latest" }), gw(cleanWorkload())},
 		{
 			"KG-011",
 			&graph.Graph{ClusterRoleBindings: []model.ClusterRoleBinding{{
@@ -195,10 +197,10 @@ func TestEachCheckPositiveAndNegative(t *testing.T) {
 
 // --- registry & metadata --------------------------------------------------
 
-func TestRegistryHas20UniqueChecks(t *testing.T) {
+func TestRegistryHas22UniqueChecks(t *testing.T) {
 	reg := Registry()
-	if len(reg) != 20 {
-		t.Fatalf("registry has %d checks, want 20", len(reg))
+	if len(reg) != 22 {
+		t.Fatalf("registry has %d checks, want 22", len(reg))
 	}
 	ids := map[string]bool{}
 	for _, c := range reg {

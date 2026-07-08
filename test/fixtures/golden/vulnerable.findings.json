@@ -549,6 +549,41 @@
     ]
   },
   {
+    "id": "KG-021",
+    "title": "Container does not drop all capabilities",
+    "severity": "medium",
+    "category": "workload-hardening",
+    "resource": {
+      "kind": "Deployment",
+      "namespace": "payments",
+      "name": "checkout"
+    },
+    "evidence": [
+      {
+        "path": "spec.containers[checkout].securityContext.capabilities.drop",
+        "value": "does not drop ALL"
+      }
+    ],
+    "remediation": {
+      "summary": "Set securityContext.capabilities.drop: [\"ALL\"] and add back only the capabilities the workload strictly requires (Pod Security \"restricted\")."
+    },
+    "refs": [
+      {
+        "framework": "CIS",
+        "id": "5.2.9"
+      },
+      {
+        "framework": "NSA",
+        "id": "k8s-hardening",
+        "title": "Pod security"
+      },
+      {
+        "framework": "PSA",
+        "id": "restricted"
+      }
+    ]
+  },
+  {
     "id": "KG-019",
     "title": "Image uses a mutable tag",
     "severity": "low",
@@ -573,6 +608,33 @@
         "framework": "CIS",
         "id": "5.5.1"
       },
+      {
+        "framework": "NSA",
+        "id": "k8s-hardening",
+        "title": "Supply chain"
+      }
+    ]
+  },
+  {
+    "id": "KG-022",
+    "title": "Image pulled from an implicit or untrusted registry",
+    "severity": "low",
+    "category": "supply-chain",
+    "resource": {
+      "kind": "Deployment",
+      "namespace": "payments",
+      "name": "checkout"
+    },
+    "evidence": [
+      {
+        "path": "spec.containers[checkout].image",
+        "value": "checkout:latest"
+      }
+    ],
+    "remediation": {
+      "summary": "Pull images from an explicit, trusted registry (e.g. registry.example.com/…) rather than an implicit Docker Hub reference, and enforce it with an admission policy."
+    },
+    "refs": [
       {
         "framework": "NSA",
         "id": "k8s-hardening",
