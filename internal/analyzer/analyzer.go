@@ -13,9 +13,16 @@ import (
 	"github.com/kubeguard/kubeguard/pkg/api"
 )
 
+// ExtraChecks produces additional findings from the built graph — the seam for
+// runtime custom policies (K3). It must be read-only over the graph.
+type ExtraChecks func(g *graph.Graph) []api.Finding
+
 // Analyze builds the graph, runs the checks, chains attack paths, and evaluates
-// compliance. The caller sets Report.GeneratedAt and Report.Source.
-func Analyze(resources []model.Resource, profileName string, assumeBreach bool) (api.Report, error) {
+// compliance. The caller sets Report.GeneratedAt and Report.Source. Optional
+// extra finding-producers (e.g. custom CEL policies) are merged into the
+// findings before posture/coverage/risk are computed, so their findings flow
+// through the same report, posture, and gate surfaces as the built-ins.
+func Analyze(resources []model.Resource, profileName string, assumeBreach bool, extra ...ExtraChecks) (api.Report, error) {
 	profile, err := checks.ProfileByName(profileName)
 	if err != nil {
 		return api.Report{}, err
@@ -27,6 +34,13 @@ func Analyze(resources []model.Resource, profileName string, assumeBreach bool) 
 
 	g := graph.Build(resources)
 	findings := checks.Scan(g, profile)
+	for _, ec := range extra {
+		if ec == nil {
+			continue
+		}
+		findings = append(findings, ec(g)...)
+	}
+	checks.SortFindings(findings) // keep deterministic order after merging custom findings
 	paths := attack.BuildPaths(g, assumeBreach)
 	frameworks := compliance.EvaluateAll(packs, profile.RunnableIDs(), compliance.FiredChecks(findings))
 

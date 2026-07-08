@@ -1,0 +1,48 @@
+# Example custom policy pack (KubeGuard K3 — policy-as-code).
+#
+# Define org-specific checks as data — CEL expressions evaluated at scan time,
+# no recompile. Run them alongside the built-in checks:
+#
+#   kubeguard scan -i manifests/ --policy examples/policies/
+#
+# Each policy's `match` is a CEL expression that returns true on a VIOLATION.
+# target: container  → evaluated per container, with `container` (and `workload`) in scope.
+# target: workload   → evaluated per workload, with `workload` in scope (default).
+#
+# Variables (resolved to Kubernetes defaults):
+#   workload:  {kind, name, namespace, serviceAccountName, hostNetwork, hostPID,
+#               hostIPC, automountServiceAccountToken, labels{}, containers[]}
+#   container: {name, image, role, privileged, runAsUser (int, -1 if unset),
+#               runAsNonRoot, readOnlyRootFilesystem, allowPrivilegeEscalation,
+#               capsAdd[], capsDrop[], seccompProfile, envSecretKeys[], hasLimits}
+apiVersion: kubeguard.io/policy/v1
+policies:
+  - id: ORG-REG-1
+    title: "Images must come from the approved internal registry"
+    severity: high
+    category: supply-chain
+    target: container
+    match: '!container.image.startsWith("registry.internal/")'
+    remediation: "Push the image to registry.internal/ and reference it from there."
+    refs:
+      - { framework: "Internal", id: "SEC-SUPPLY-1", title: "Approved registries" }
+
+  - id: ORG-LABEL-1
+    title: "Workloads must carry a team ownership label"
+    severity: low
+    category: workload-hardening
+    target: workload
+    match: '!("team" in workload.labels)'
+    remediation: "Add a metadata.labels.team label naming the owning team."
+    refs:
+      - { framework: "Internal", id: "OPS-OWN-1", title: "Ownership labels" }
+
+  - id: ORG-ROOT-1
+    title: "Containers must not run as UID 0 (org policy)"
+    severity: high
+    category: workload-hardening
+    target: container
+    match: 'container.runAsUser == 0'
+    remediation: "Set securityContext.runAsUser to a non-zero UID (>= 1000)."
+    refs:
+      - { framework: "Internal", id: "SEC-ROOT-1", title: "No root containers" }

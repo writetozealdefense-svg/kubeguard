@@ -14,6 +14,7 @@ import (
 	"github.com/kubeguard/kubeguard/internal/loader/live"
 	"github.com/kubeguard/kubeguard/internal/loader/offline"
 	"github.com/kubeguard/kubeguard/internal/model"
+	"github.com/kubeguard/kubeguard/internal/policy"
 	"github.com/kubeguard/kubeguard/internal/report"
 	"github.com/kubeguard/kubeguard/internal/waiver"
 	"github.com/kubeguard/kubeguard/pkg/api"
@@ -32,6 +33,7 @@ type scanParams struct {
 	live         bool
 	kubeContext  string
 	waiversPath  string
+	policyPath   string
 }
 
 func newScanCmd() *cobra.Command {
@@ -59,6 +61,7 @@ func newScanCmd() *cobra.Command {
 	f.BoolVar(&p.assumeBreach, "assume-breach", false, "seed every workload as reachable from an in-cluster foothold")
 	f.StringVar(&p.failOn, "fail-on", "", "exit non-zero if any finding is at or above this severity: critical|high|medium|low")
 	f.StringVar(&p.waiversPath, "waivers", "", "offline waiver file (YAML/JSON); actively-waived findings don't trip --fail-on but are logged")
+	f.StringVar(&p.policyPath, "policy", "", "custom policy pack file or directory (CEL, kubeguard.io/policy/v1); runs alongside the built-in checks")
 	f.StringVar(&p.historyPath, "history", "", "append this scan to a history store (.sqlite/.db/.kgdb → SQLite, else JSONL)")
 	f.BoolVar(&p.watch, "watch", false, "re-scan when the input changes")
 	f.BoolVar(&p.live, "live", false, "scan a live cluster read-only via kubeconfig instead of files")
@@ -99,7 +102,16 @@ func runScan(cmd *cobra.Command, p scanParams) error {
 	if err != nil {
 		return err
 	}
-	rep, err := analyzer.Analyze(resources, p.profileName, p.assumeBreach)
+	var extra []analyzer.ExtraChecks
+	if p.policyPath != "" {
+		policies, err := policy.Load(p.policyPath)
+		if err != nil {
+			return err
+		}
+		extra = append(extra, policies.Evaluate)
+		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "loaded %d custom policies from %s\n", policies.Len(), p.policyPath)
+	}
+	rep, err := analyzer.Analyze(resources, p.profileName, p.assumeBreach, extra...)
 	if err != nil {
 		return err
 	}

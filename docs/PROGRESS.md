@@ -216,6 +216,37 @@ had none). Results:
   goldens **unchanged** (new checks map to no pack control and grant no attack
   primitive). Full gate green.
 
+## KSPM K3 — Custom policy-as-code (CEL) (done)
+
+- **[NEW] `internal/policy`**: operators define org-specific checks as **data** — a
+  YAML pack of CEL expressions loaded at scan time, no fork/recompile. Matches
+  become standard `api.Finding`s that flow through the same report, `--fail-on`
+  gate, SARIF/GitOps output, dashboard lifecycle, and waivers as the built-ins.
+- **⟐ DECISION (engine): CEL** (`google/cel-go`) — pure-Go + fully offline (honours
+  the offline-first/no-telemetry constitution) and the same language Kubernetes
+  uses for ValidatingAdmissionPolicy (familiar syntax). Rego/OPA rejected (heavier
+  runtime, second policy language, no benefit).
+- Pack schema `apiVersion: kubeguard.io/policy/v1`; each policy: id, title,
+  severity, category, `target` (workload|container), CEL `match` (true =
+  violation), remediation, refs. **Strict load** (`UnmarshalStrict` — unknown keys
+  rejected) + validation: severity valid, match compiles and is boolean (bool or
+  dyn; a statically-typed non-bool like `1 + 1` is rejected). Per-resource eval
+  errors are tolerated (never abort the scan). Normalized `workload`/`container`
+  CEL variables resolved to k8s defaults.
+- Wired via `analyzer.ExtraChecks` (variadic; existing callers unchanged) and the
+  `scan --policy <file|dir>` flag. Custom findings get risk scores + posture but
+  do **not** map to compliance frameworks (honest metrics preserved).
+- Ships 3 example policies (`examples/policies/example-policies.yaml`) + docs
+  (`docs/custom-policies.md`). Added `google/cel-go` (go.mod/go.sum tidied).
+- **Acceptance:** `internal/policy/policy_test.go` (sample policy detects a
+  vulnerable-fixture misconfig with no recompile; shipped pack loads + fires;
+  8 malformed-pack cases rejected — bad apiVersion/unknown key/bad severity/
+  missing match/non-bool/uncompilable/bad target/empty; container vs workload
+  scope; eval-error tolerated; nil-safe) — 85% coverage. `internal/cli/policy_test.go`
+  (scan --policy emits ORG-* findings; custom high-sev trips --fail-on;
+  malformed pack fails the scan). Full gate green; goldens unchanged (custom
+  policies run only under --policy).
+
 | Squad | Status | Notes |
 |---|---|---|
 | A — Scaffold | ✅ done | module, §13 layout, cobra + `version`, slog, `.golangci.yml`, CI matrix, 3 golden fixtures |
