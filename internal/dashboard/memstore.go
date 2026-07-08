@@ -1,6 +1,7 @@
 package dashboard
 
 import (
+	"context"
 	"sort"
 	"sync"
 
@@ -17,8 +18,9 @@ type clusterState struct {
 }
 
 type tenantState struct {
-	clusters map[string]*clusterState
-	order    []string // cluster registration order, for stable listing
+	clusters    map[string]*clusterState
+	order       []string // cluster registration order, for stable listing
+	displayName string
 }
 
 // MemStore is an in-memory, tenant-partitioned Store. Safe for concurrent use.
@@ -232,6 +234,30 @@ func (m *MemStore) History(tenant, clusterID string) []HistorySnapshot {
 		out = []HistorySnapshot{}
 	}
 	return out
+}
+
+// --- operator lifecycle (K8) ---
+
+// ProvisionTenant creates a tenant partition (idempotent), recording a display
+// name. context is unused for the in-memory store.
+func (m *MemStore) ProvisionTenant(_ context.Context, tenant, displayName string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	ts := m.tenant(tenant)
+	if displayName != "" {
+		ts.displayName = displayName
+	}
+	return nil
+}
+
+// DeleteTenant hard-deletes all of a tenant's data (DPDP right-to-erasure):
+// clusters, scans, history, and lifecycle rows. context is unused in-memory.
+func (m *MemStore) DeleteTenant(_ context.Context, tenant string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	delete(m.tenants, tenant)
+	delete(m.lifecycle, tenant)
+	return nil
 }
 
 // --- findings lifecycle (K6) ---

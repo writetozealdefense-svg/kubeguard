@@ -113,4 +113,12 @@ type Store interface {
 	ListLifecycle(tenant, clusterID string) []FindingLifecycle
 	// UpsertLifecycle persists a lifecycle row (create or replace).
 	UpsertLifecycle(tenant string, lc FindingLifecycle)
+
+	// --- operator lifecycle (K8) ---
+	// ProvisionTenant creates a tenant partition (idempotent), recording an
+	// optional display name. Used by the managed onboarding API; JIT provisioning
+	// on first valid JWT is the default path.
+	ProvisionTenant(ctx context.Context, tenant, displayName string) error
+	// DeleteTenant hard-deletes all of a tenant's data (DPDP right-to-erasure).
+	DeleteTenant(ctx context.Context, tenant string) error
 }

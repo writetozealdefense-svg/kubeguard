@@ -145,6 +145,49 @@ had none). Results:
 - Local-env note: Go build/lint caches moved to D: (`GOCACHE`/`GOTMPDIR`/
   `GOLANGCI_LINT_CACHE`) because C: filled during a build — no repo impact.
 
+## KSPM K8 — Operator lifecycle (DPDP erasure, tenant provisioning) + SARIF schema (done; 2 residuals)
+
+- **[NEW] Super-admin principal**: `Principal.SuperAdmin` (cross-tenant authority),
+  from a `role: super-admin` JWT claim; `requireSuperAdmin` middleware. Orthogonal
+  to the tenant-scoped viewer/analyst/admin ladder.
+- **[NEW] DPDP tenant erasure (was A1a)**: `Store.DeleteTenant(ctx,tenant)` on the
+  interface + MemStore (pg already had it; now also purges lifecycle rows).
+  `DELETE /v1/tenants/{tenant}` — admin for the caller's own tenant, super-admin
+  for any other; audited in the *acting* principal's tenant so a super-admin's
+  proof-of-erasure survives the purge; mem audit log gains `PurgeTenant` (audit
+  entries are personal data too). CLI `kubeguard dashboard-admin delete-tenant`
+  for out-of-band/air-gapped DSAR. OpenAPI added.
+- **[NEW] Tenant provisioning (was A1c)**: `Store.ProvisionTenant(ctx,tenant,
+  displayName)` (mem + pg; migration `0003` adds `display_name`).
+  `POST /v1/tenants` super-admin, idempotent; JIT-on-first-JWT documented as the
+  default. OpenAPI added.
+- **[DOC] DSAR runbook (was A2)**: `docs/privacy.md` (API + CLI erasure paths,
+  verification steps, proof-of-erasure) + `docs/admin-guide.md` (tenancy section:
+  JIT vs managed provisioning, erasure pointer).
+- **[NEW] SARIF 2.1.0 schema validation (was A3)**: build-tagged
+  `internal/report/sarif_schema_test.go` validates emitted SARIF (vulnerable +
+  hardened) against the **official** SARIF 2.1.0 JSON Schema (embedded
+  `testdata/sarif-2.1.0.schema.json`, 112 KB) via `santhosh-tekuri/jsonschema/v6`
+  (promoted to a direct dep). Both fixtures **conform**. CI step added to
+  `ci.yml` (`go test -tags sarif_schema`).
+- ⟐ **[A5] Security contact**: SECURITY.md still says `security@kubeguard.io` —
+  **left unchanged pending the correct Zeal Defense address** (the brief says do
+  not guess; I asked but the answer is outstanding).
+- **Residuals (honest):** the **evidence bundle** (findings+posture+**audit**,
+  timestamped) and an explicit **CIS/NSA control coverage view** are NOT newly
+  built — per-framework auditor **evidence packs already exist** (`scan -f
+  evidence`) and CIS is already a compliance pack (breached-of-assessed) with NSA
+  refs on findings; a combined audit-inclusive bundle and a dedicated NSA coverage
+  surface are follow-ons.
+- **Acceptance:** `internal/dashboard/tenants_test.go` (provision super-admin-only
+  + idempotent; erase own vs cross-tenant 403; DPDP removes clusters/lifecycle/
+  audit; cross-tenant proof survives) — mem green. pg tests written
+  (`TestProvisionTenantIdempotent`, updated `TestDeleteTenantDPDP`) and skip-gated;
+  **not run against real Postgres this session** (Docker Desktop was down from the
+  disk-full condition) — the analogous K6 pg suite was verified against real
+  Postgres earlier and migration 0003 is a trivial ADD COLUMN. SARIF schema test
+  passes. Full offline gate green (build/vet/lint/test); goldens unchanged.
+
 | Squad | Status | Notes |
 |---|---|---|
 | A — Scaffold | ✅ done | module, §13 layout, cobra + `version`, slog, `.golangci.yml`, CI matrix, 3 golden fixtures |

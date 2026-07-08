@@ -26,13 +26,42 @@ window hourly (the latest scan per cluster is always kept so lenses keep
 rendering). Set it to bound how long history and the associated `subject` audit
 records persist. With no retention set, data is kept until manually pruned.
 
-## Right to erasure (DPDP / GDPR-style)
-A tenant's data is hard-deleted irreversibly across every table:
-```go
-store.DeleteTenant(ctx, "<tenant>")
+## Right to erasure — DSAR runbook (DPDP / GDPR-style)
+
+A tenant's data is hard-deleted **irreversibly** across every table (clusters,
+scans, history, findings lifecycle, **audit**, users, and the tenant row). There
+is no soft-delete or tombstone. Two execution paths:
+
+**1. API (managed):** `DELETE /v1/tenants/{tenant}`.
+- A tenant-scoped **admin** may erase **their own** tenant.
+- Erasing **any other** tenant requires a **super-admin** principal (a
+  `role: super-admin` JWT claim). A tenant admin attempting a cross-tenant
+  erasure gets `403`.
+- The erasure is recorded in the **acting principal's** tenant, so a super-admin's
+  proof-of-erasure survives the purge of the target tenant. Response: `204`.
+
+**2. CLI (out-of-band / air-gapped):** for a DSAR executed directly against the
+store with no HTTP surface:
+```sh
+kubeguard dashboard-admin delete-tenant --tenant <id> \
+  --postgres 'postgres://…?sslmode=require'   # or KUBEGUARD_POSTGRES_DSN
 ```
-This removes clusters, scans, history, **audit**, users, and the tenant row.
-There is no soft-delete or tombstone. Log the request in your DSAR register.
+Prints `erased all data for tenant "<id>"` on success. Run this from an operator
+host and capture the command + output in your DSAR register.
+
+**Runbook steps:**
+1. Verify the requester's identity and the tenant id out-of-band.
+2. Record the request in the DSAR register (requester, tenant, date, ticket).
+3. Execute the erasure (API as super-admin, or the CLI on an operator host).
+4. Confirm: `GET /v1/clusters` for the tenant returns none, and a fresh scan of
+   any former cluster 404s. In Postgres:
+   `SELECT count(*) FROM clusters WHERE tenant='<id>';` → 0.
+5. File the proof-of-erasure (the super-admin audit entry, or the CLI output) in
+   the register. Note the erasure is irreversible — restoring the tenant means a
+   fresh re-provision, not recovery.
+
+The **only** personal data erased is the tenant's identity/audit rows (§"What
+personal data is stored"); scan content contains none.
 
 ## Access, portability
 - **Access/portability:** a tenant's data is exportable via the Reports lens

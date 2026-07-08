@@ -70,9 +70,21 @@ func (j *JWTAuth) Authenticate(r *http.Request) (Principal, bool) {
 		return Principal{}, false // every principal must be tenant-scoped
 	}
 	sub, _ := claims["sub"].(string)
-	role := parseRole(claims[j.cfg.RoleClaim])
-	return Principal{Subject: sub, Tenant: tenant, Role: role}, true
+	roleClaim, _ := claims[j.cfg.RoleClaim].(string)
+	role := parseRole(roleClaim)
+	// A "super-admin" role claim grants cross-tenant operator authority and acts
+	// as admin within a tenant.
+	super := roleClaim == string(roleSuperAdmin)
+	if super {
+		role = RoleAdmin
+	}
+	return Principal{Subject: sub, Tenant: tenant, Role: role, SuperAdmin: super}, true
 }
+
+// roleSuperAdmin is the role-claim value that grants cross-tenant authority. It
+// is not a rank in the viewer<analyst<admin ladder — it maps to admin Role plus
+// the SuperAdmin flag.
+const roleSuperAdmin Role = "super-admin"
 
 // parseRole maps a role claim (string) to a Role, defaulting to viewer (least
 // privilege) when absent or unrecognized.

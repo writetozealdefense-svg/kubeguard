@@ -49,7 +49,7 @@ func newTestStore(t *testing.T) *Store {
 	}
 	// Clean slate.
 	if _, err := st.pool.Exec(context.Background(),
-		`TRUNCATE finding_lifecycle, audit, history, scans, clusters, users, tenants`); err != nil {
+		`TRUNCATE finding_lifecycle, audit, history, scans, clusters, users, tenants CASCADE`); err != nil {
 		t.Fatalf("truncate: %v", err)
 	}
 	t.Cleanup(st.Close)
@@ -228,10 +228,30 @@ func TestPgFindingLifecycle(t *testing.T) {
 	}
 }
 
+func TestProvisionTenantIdempotent(t *testing.T) {
+	st := newTestStore(t)
+	ctx := context.Background()
+	if err := st.ProvisionTenant(ctx, "newco", "New Co"); err != nil {
+		t.Fatal(err)
+	}
+	// Idempotent: re-provisioning updates the display name, no error.
+	if err := st.ProvisionTenant(ctx, "newco", "New Co Renamed"); err != nil {
+		t.Fatal(err)
+	}
+	var name string
+	if err := st.pool.QueryRow(ctx, `SELECT COALESCE(display_name,'') FROM tenants WHERE id=$1`, "newco").Scan(&name); err != nil {
+		t.Fatal(err)
+	}
+	if name != "New Co Renamed" {
+		t.Fatalf("display name = %q, want New Co Renamed", name)
+	}
+}
+
 func TestDeleteTenantDPDP(t *testing.T) {
 	st := newTestStore(t)
 	st.RegisterCluster("acme", dashboard.Cluster{ID: "prod-eu", Name: "prod-eu"})
 	st.RecordScan("acme", "prod-eu", "s1", sample(), "2026-06-07T00:00:00Z")
+	st.SeedFindings("acme", "prod-eu", sample().Findings, "2026-06-07T00:00:00Z")
 	st.Write(dashboard.AuditEntry{At: "2026-06-07T00:00:00Z", Subject: "u", Tenant: "acme", Action: "x", Result: "allowed"})
 
 	if err := st.DeleteTenant(context.Background(), "acme"); err != nil {
@@ -239,5 +259,8 @@ func TestDeleteTenantDPDP(t *testing.T) {
 	}
 	if len(st.ListClusters("acme")) != 0 || len(st.History("acme", "")) != 0 || len(st.List("acme")) != 0 {
 		t.Fatal("DPDP hard-delete left residual data")
+	}
+	if len(st.ListLifecycle("acme", "")) != 0 {
+		t.Fatal("DPDP hard-delete left residual lifecycle rows")
 	}
 }

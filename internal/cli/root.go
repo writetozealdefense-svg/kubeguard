@@ -52,6 +52,7 @@ func NewRootCmd() *cobra.Command {
 	root.AddCommand(newHardenCmd())
 	root.AddCommand(newServeCmd())
 	root.AddCommand(newDashboardCmd())
+	root.AddCommand(newDashboardAdminCmd())
 	root.AddCommand(newWebhookCmd())
 	return root
 }

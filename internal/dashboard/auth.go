@@ -34,6 +34,11 @@ type Principal struct {
 	Subject string
 	Tenant  string
 	Role    Role
+	// SuperAdmin grants cross-tenant operator authority (tenant provisioning and
+	// erasing a tenant other than the caller's own). It is orthogonal to Role —
+	// a super-admin still acts as an admin within a tenant. Set from a dedicated
+	// claim/token, never inferred from the tenant-scoped role.
+	SuperAdmin bool
 }
 
 // Authenticator resolves a request to a Principal. D2 ships a static token
@@ -119,6 +124,30 @@ func (a *API) authMiddleware(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r.WithContext(withPrincipal(r.Context(), p)))
 	})
+}
+
+// requireSuperAdmin returns middleware that admits only a super-admin principal
+// (cross-tenant operator authority: tenant provisioning/erasure across tenants).
+// A denied attempt on a privileged route is audited.
+func (a *API) requireSuperAdmin(action string) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			p, ok := PrincipalFrom(r.Context())
+			if !ok {
+				writeError(w, http.StatusUnauthorized, "unauthenticated")
+				return
+			}
+			if !p.SuperAdmin {
+				a.audit.Write(AuditEntry{
+					At: a.now(), Subject: p.Subject, Tenant: p.Tenant,
+					Action: action, Result: "denied",
+				})
+				writeError(w, http.StatusForbidden, "super-admin required")
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
 }
 
 // requireRole returns middleware that enforces a minimum role. A viewer hitting

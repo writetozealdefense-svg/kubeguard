@@ -51,5 +51,20 @@ helm upgrade kgd charts/kubeguard-dashboard -n kubeguard \
 Migrations apply automatically on start (additive/expand-contract; a rollback
 needs no DB down-migration). Promote the **same digest** staging→prod.
 
-## 7. Data & privacy
+## 7. Tenancy (provisioning & erasure)
+
+**Provisioning.** The default is **JIT (just-in-time)**: the first valid JWT for a
+new tenant auto-creates its partition — no onboarding step needed for IdP-driven
+deployments. For a **managed** onboarding flow, a **super-admin** (a
+`role: super-admin` JWT claim) can pre-create a tenant:
+```
+POST /v1/tenants   {"tenant": "<id>", "displayName": "<name>"}   # super-admin, idempotent
+```
+
+**Erasure (DSAR/DPDP).** `DELETE /v1/tenants/{tenant}` (admin for your own tenant,
+super-admin for any other), or the out-of-band CLI
+`kubeguard dashboard-admin delete-tenant --tenant <id> --postgres <dsn>`. Full
+runbook: [privacy.md → Right to erasure](privacy.md#right-to-erasure--dsar-runbook-dpdp--gdpr-style).
+
+## 8. Data & privacy
 What personal data is stored, retention, and DPDP erasure: [privacy.md](privacy.md).

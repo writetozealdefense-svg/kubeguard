@@ -173,17 +173,19 @@ launch but sign-off gates the "fully audited" claim.
 - [x] Live cluster scanning in dashboard — *applied*
 - [x] OpenAPI completeness — *applied*
 - [x] Sign off ARCHITECTURE.md — *applied*
-- [x] Dynamic cluster management — *K1 applied: POST/DELETE /v1/clusters (admin, cluster.write), mutex-guarded source registry lifted out of the closure, MemStore+pg DeleteCluster, OpenAPI + ±/− tests* · [ ] DPDP erasure operator path · Multi-tenant provisioning — *A1a/A1c pending in K8*
+- [x] Dynamic cluster management — *K1 applied: POST/DELETE /v1/clusters (admin, cluster.write), mutex-guarded source registry lifted out of the closure, MemStore+pg DeleteCluster, OpenAPI + ±/− tests*
+- [x] DPDP erasure operator path (A1a) — *K8: Store.DeleteTenant (mem+pg), DELETE /v1/tenants/{tenant} (admin own / super-admin cross), CLI dashboard-admin delete-tenant, DSAR runbook; mem tests green, pg tests written*
+- [x] Multi-tenant provisioning (A1c) — *K8: ProvisionTenant (mem+pg, migration 0003), POST /v1/tenants super-admin idempotent, JIT default documented*
 - [ ] Rate limiting in prod · Enable HPA · ServiceMonitor — *Track B (set values)*
 - [ ] ZealDefense integration — *A4 (epic)*
-- [ ] Security contact — *A5*
+- [~] Security contact — *A5: blocked on the correct Zeal Defense address; SECURITY.md unchanged (not guessed)*
 
 **🟢 Deferred (now in scope for 100%)**
 
 - [x] Per-PR Trivy image scan — *applied*
 - [x] cert-manager in Helm — *applied*
 - [x] Automated Postgres backup Job — *applied*
-- [ ] SARIF full JSON-Schema validation — *A3*
+- [x] SARIF full JSON-Schema validation (A3) — *K8: build-tagged test validates emitted SARIF (vulnerable+hardened) against the official 2.1.0 schema via santhosh-tekuri/jsonschema; CI step in ci.yml*
 - [ ] Keyless cosign signing — *Track B (CI OIDC on main/tags; already wired)*
 - [ ] Standalone worker Deployment — *accept in-process model or split (design decision)*
 - [ ] Formal pen test / ASVS L2 audit — *Track C*

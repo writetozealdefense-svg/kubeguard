@@ -363,6 +363,19 @@ func (s *Store) Retention(ctx context.Context, cutoffRFC3339 string) (int64, err
 	return st.RowsAffected() + ht.RowsAffected(), nil
 }
 
+// ProvisionTenant creates a tenant partition (idempotent), recording a display
+// name. Used by the managed onboarding API; JIT-on-first-JWT is the default.
+func (s *Store) ProvisionTenant(ctx context.Context, tenant, displayName string) error {
+	_, err := s.pool.Exec(ctx,
+		`INSERT INTO tenants (id, display_name) VALUES ($1, $2)
+		 ON CONFLICT (id) DO UPDATE SET display_name = COALESCE(EXCLUDED.display_name, tenants.display_name)`,
+		tenant, nullStr(displayName))
+	if err != nil {
+		return fmt.Errorf("provision tenant: %w", err)
+	}
+	return nil
+}
+
 // DeleteTenant hard-deletes all of a tenant's data (DPDP right-to-erasure).
 func (s *Store) DeleteTenant(ctx context.Context, tenant string) error {
 	for _, table := range []string{"finding_lifecycle", "audit", "history", "scans", "clusters", "users", "tenants"} {

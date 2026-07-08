@@ -45,3 +45,19 @@ func (a *MemAuditLog) List(tenant string) []AuditEntry {
 	defer a.mu.RUnlock()
 	return append([]AuditEntry{}, a.entries[tenant]...)
 }
+
+// PurgeTenant removes a tenant's audit entries (DPDP erasure — audit entries are
+// personal data too). The proof-of-erasure record lives in the acting operator's
+// tenant, not the erased one, so it survives this purge.
+func (a *MemAuditLog) PurgeTenant(tenant string) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	delete(a.entries, tenant)
+}
+
+// tenantPurger is implemented by audit logs that can erase a tenant's entries
+// (MemAuditLog). The pg audit log erases audit rows inside Store.DeleteTenant,
+// so it does not implement this — the erasure handler calls whichever applies.
+type tenantPurger interface {
+	PurgeTenant(tenant string)
+}

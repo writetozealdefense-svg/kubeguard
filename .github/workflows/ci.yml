@@ -29,6 +29,11 @@ jobs:
         run: go test -race -coverprofile=coverage.out ./...
       - name: coverage summary
         run: go tool cover -func=coverage.out | tail -1
+      - name: SARIF 2.1.0 schema conformance
+        # Validates emitted SARIF (vulnerable + hardened) against the official
+        # SARIF 2.1.0 JSON Schema. Behind the sarif_schema build tag so the
+        # default test run stays fast.
+        run: go test -tags sarif_schema ./internal/report/ -run SARIFConforms
 
   lint:
     name: golangci-lint

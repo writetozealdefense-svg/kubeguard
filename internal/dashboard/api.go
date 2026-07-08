@@ -196,6 +196,7 @@ func (a *API) routes() http.Handler {
 		r.Get("/report", a.handleReport)
 		r.Get("/stream", a.handleStream)
 		a.registerLifecycleRoutes(r) // findings lifecycle (K6)
+		a.registerTenantRoutes(r)    // operator lifecycle (K8)
 	})
 	return r
 }
