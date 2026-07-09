@@ -22,6 +22,11 @@ clusters:
   - id: prod
     path: /manifests/prod
 
+# Optional: name of an existing ConfigMap whose keys are manifest files. It is
+# mounted read-only at /manifests, so clusters[].path can point at /manifests
+# (whole dir) or /manifests/<key>. Leave empty to bring your own volume.
+manifestsConfigMap: ""
+
 profile: zeal-default
 brand: KubeGuard           # co-brand on PDF exports
 schedule: ""               # cron, e.g. "0 * * * *"

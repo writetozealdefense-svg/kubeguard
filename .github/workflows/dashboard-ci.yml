@@ -99,17 +99,29 @@ jobs:
           kind load docker-image kubeguard:ci kubeguard-web:ci
       - name: Install chart
         run: |
-          mkdir -p manifests && cp test/fixtures/vulnerable.yaml manifests/
-          helm install kgd charts/kubeguard-dashboard -n kubeguard --create-namespace \
+          kubectl create namespace kubeguard
+          # The scan target must live inside the cluster: ship the fixture as a
+          # ConfigMap the chart mounts at /manifests (a dir on the runner is
+          # invisible to pods).
+          kubectl -n kubeguard create configmap kg-manifests \
+            --from-file=vulnerable.yaml=test/fixtures/vulnerable.yaml
+          helm install kgd charts/kubeguard-dashboard -n kubeguard \
             --set image.api.repository=kubeguard --set image.api.tag=ci --set image.api.pullPolicy=Never \
             --set image.web.repository=kubeguard-web --set image.web.tag=ci \
             --set image.pullPolicy=Never \
+            --set manifestsConfigMap=kg-manifests \
             --set clusters[0].id=demo --set clusters[0].path=/manifests
       - name: Wait + smoke
         run: |
           kubectl -n kubeguard rollout status deploy/kgd-kubeguard-dashboard-api --timeout=120s
           kubectl -n kubeguard run smoke --restart=Never --image=curlimages/curl --rm -i --quiet -- \
             -sf http://kgd-kubeguard-dashboard-api:8080/healthz
+      - name: Diagnostics
+        if: failure()
+        run: |
+          kubectl -n kubeguard get all
+          kubectl -n kubeguard describe pods
+          kubectl -n kubeguard logs deploy/kgd-kubeguard-dashboard-api --tail=100 --all-containers || true
 
   load-smoke:
     name: load · k6 smoke

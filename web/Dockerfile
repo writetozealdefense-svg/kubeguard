@@ -9,6 +9,13 @@ COPY . .
 RUN npm run build
 
 FROM nginxinc/nginx-unprivileged:1.29-alpine
+# Patch OS packages: the published base image lags the Alpine secdb (openssl,
+# libexpat, libxml2 fixes ship as package revisions before an image rebuild).
+USER root
+RUN apk --no-cache upgrade
+# Back to the image's unprivileged nginx user (also satisfies trivy DS-0002,
+# which requires an explicit non-root USER in the Dockerfile).
+USER 101
 COPY --from=build /app/dist /usr/share/nginx/html
 # Ship the server block as a template, not a baked conf. nginx.conf carries a
 # ${BFF_HOST} placeholder; the base image's entrypoint runs envsubst over
