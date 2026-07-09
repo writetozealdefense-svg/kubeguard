@@ -27,6 +27,8 @@ jobs:
       - name: go vet
         run: go vet ./...
       - name: go test
+        env:
+          CGO_ENABLED: "1" # -race requires cgo
         run: go test -race -coverprofile=coverage.out ./...
       - name: coverage summary
         run: go tool cover -func=coverage.out | tail -1
@@ -45,9 +47,9 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
-      - uses: golangci/golangci-lint-action@v6
+      - uses: golangci/golangci-lint-action@v7
         with:
-          version: v2.1.6
+          version: v2.12.2
 
   harden-validate:
     name: harden bundle · kubeconform

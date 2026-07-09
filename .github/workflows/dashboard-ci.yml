@@ -23,8 +23,8 @@ jobs:
       - run: go build ./...
       - run: go vet ./...
       - run: go test ./... -count=1
-      - uses: golangci/golangci-lint-action@v6
-        with: { version: latest }
+      - uses: golangci/golangci-lint-action@v7
+        with: { version: v2.12.2 }
 
   integration-postgres:
     name: integration · Postgres

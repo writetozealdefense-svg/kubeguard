@@ -2,6 +2,9 @@ module github.com/kubeguard/kubeguard
 
 go 1.26.1
 
+// GO-2026-5856 (crypto/tls ECH privacy leak) is fixed in the go1.26.5 runtime.
+toolchain go1.26.5
+
 require (
 	github.com/getkin/kin-openapi v0.140.0
 	github.com/go-chi/chi/v5 v5.3.0

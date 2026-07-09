@@ -1,0 +1,10 @@
+# Gitleaks config — extends the default ruleset.
+[extend]
+useDefault = true
+
+# "local-admin" is the documented docker-compose default for local dev
+# (see .env.example and docs/local-docker.md). It is not a real credential,
+# and it lives in git history, so it must be allowlisted rather than reworded.
+[[allowlists]]
+description = "documented local-dev placeholder bearer token"
+regexes = ['''Bearer local-admin''']
