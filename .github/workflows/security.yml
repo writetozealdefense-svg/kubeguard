@@ -50,6 +50,9 @@ jobs:
           scanners: vuln,misconfig,secret
           severity: HIGH,CRITICAL
           exit-code: "1"
+          # demo/ and test/fixtures/ are KubeGuard's intentionally vulnerable
+          # scan targets — misconfigurations there are the product, not a bug.
+          skip-dirs: demo,test/fixtures
           ignore-unfixed: true
 
   trivy-image:

@@ -7,4 +7,7 @@ useDefault = true
 # and it lives in git history, so it must be allowlisted rather than reworded.
 [[allowlists]]
 description = "documented local-dev placeholder bearer token"
+# Match against the whole line: the default regexTarget is the captured
+# secret, which is redacted/partial and never matches the full header.
+regexTarget = "line"
 regexes = ['''Bearer local-admin''']
