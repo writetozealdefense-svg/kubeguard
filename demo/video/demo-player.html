@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>KubeGuard — narrated CLI demo</title>
+<style>
+  :root {
+    --bg: #0b0f14; --panel: #0d1117; --edge: #1f2733;
+    --fg: #c9d1d9; --dim: #8b949e; --cyan: #58d6ff; --green: #3fb950;
+    --red: #f85149; --amber: #d29922; --purple: #bc8cff; --prompt: #7ee787;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { height: 100%; background: var(--bg); font-family: 'Cascadia Code','JetBrains Mono',Consolas,monospace; }
+  #stage { height: 100%; display: flex; flex-direction: column; padding: 3vh 6vw; }
+
+  #titlebar { display: flex; align-items: center; gap: 8px; background: var(--edge);
+    border-radius: 10px 10px 0 0; padding: 10px 14px; color: var(--dim); font-size: 13px; }
+  #titlebar .dot { width: 12px; height: 12px; border-radius: 50%; }
+  #term { flex: 1; background: var(--panel); border: 1px solid var(--edge); border-top: none;
+    border-radius: 0 0 10px 10px; padding: 22px 26px; overflow: hidden;
+    font-size: clamp(13px, 1.45vw, 19px); line-height: 1.5; color: var(--fg); white-space: pre-wrap; }
+  #term .banner { color: var(--cyan); font-weight: bold; }
+  #term .prompt { color: var(--prompt); }
+  #term .dim    { color: var(--dim); }
+  #term .ok     { color: var(--green); font-weight: bold; }
+  #term .crit   { color: var(--red); font-weight: bold; }
+  #term .high   { color: var(--amber); }
+  #term .step   { color: var(--purple); }
+  #cursor { display: inline-block; width: 0.55em; height: 1.1em; background: var(--fg);
+    vertical-align: text-bottom; animation: blink 1s steps(1) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  #caption { margin-top: 2.2vh; min-height: 3.2em; display: flex; align-items: center; justify-content: center;
+    text-align: center; color: #e6edf3; font-family: 'Segoe UI', system-ui, sans-serif;
+    font-size: clamp(15px, 1.9vw, 24px); font-weight: 500; text-wrap: balance; }
+  #caption em { color: var(--cyan); font-style: normal; }
+
+  #progress { height: 4px; background: var(--edge); border-radius: 2px; margin-top: 1.6vh; }
+  #bar { height: 100%; width: 0%; background: var(--cyan); border-radius: 2px; transition: width .4s linear; }
+
+  #pauseTag { position: fixed; top: 14px; left: 50%; transform: translateX(-50%); z-index: 8;
+    background: rgba(210,153,34,.15); border: 1px solid var(--amber); color: var(--amber);
+    font-family: 'Segoe UI', system-ui, sans-serif; font-size: 14px; font-weight: 600;
+    padding: 6px 16px; border-radius: 999px; opacity: 0; transition: opacity .2s; pointer-events: none; }
+  #pauseTag.show { opacity: 1; }
+
+  .card { position: fixed; inset: 0; z-index: 6; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; text-align: center; gap: 10px;
+    font-family: 'Segoe UI', system-ui, sans-serif; opacity: 0; pointer-events: none;
+    transition: opacity .6s ease; background:
+      radial-gradient(1200px 600px at 50% 40%, #10202b 0%, var(--bg) 70%); }
+  .card.show { opacity: 1; }
+  .card .shield { font-size: clamp(40px, 6vw, 84px); filter: drop-shadow(0 0 22px rgba(88,214,255,.45)); }
+  .card .wordmark { font-size: clamp(40px, 7.5vw, 96px); font-weight: 800; letter-spacing: -1px;
+    background: linear-gradient(92deg, #7ee787, #58d6ff 60%, #bc8cff);
+    -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .card .tag { color: var(--fg); font-size: clamp(16px, 2.2vw, 27px); font-weight: 500; max-width: 24ch; }
+  .card .meta { color: var(--dim); font-size: clamp(13px, 1.5vw, 18px); }
+  .card .url { color: var(--cyan); font-family: 'Cascadia Code', monospace;
+    font-size: clamp(14px, 1.7vw, 22px); margin-top: 8px; }
+  .card .recap { color: var(--green); font-weight: 600; font-size: clamp(15px, 1.9vw, 23px); }
+  .card .badge { margin-top: 10px; color: var(--dim); font-size: clamp(12px, 1.4vw, 16px);
+    border: 1px solid var(--edge); border-radius: 999px; padding: 6px 16px; }
+  .card.show .wordmark { animation: rise .8s ease both; }
+  .card.show .tag, .card.show .recap { animation: rise .8s .15s ease both; }
+  @keyframes rise { from { opacity: 0; transform: translateY(14px) scale(.98); } to { opacity: 1; transform: none; } }
+
+  #controls { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: rgba(4,8,12,.82); backdrop-filter: blur(3px); z-index: 10;
+    font-family: 'Segoe UI', system-ui, sans-serif; }
+  #controls.hidden { display: none; }
+  #panelbox { text-align: center; color: var(--fg); max-width: 640px; padding: 24px; }
+  #panelbox h1 { font-size: 30px; margin-bottom: 6px; color: #fff; }
+  #panelbox .sub { color: var(--dim); margin-bottom: 26px; }
+  button.big { font-size: 20px; padding: 12px 44px; border-radius: 999px; border: none; cursor: pointer;
+    background: var(--cyan); color: #05222e; font-weight: 700; }
+  .row { margin-top: 18px; display: flex; gap: 14px; justify-content: center; align-items: center;
+    color: var(--dim); font-size: 14px; flex-wrap: wrap; }
+  select { background: var(--panel); color: var(--fg); border: 1px solid var(--edge); border-radius: 6px; padding: 4px 8px; max-width: 340px; }
+  .hint { margin-top: 22px; color: var(--dim); font-size: 13px; }
+  kbd { background: var(--edge); border-radius: 4px; padding: 1px 7px; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="titlebar">
+    <span class="dot" style="background:#ff5f57"></span>
+    <span class="dot" style="background:#febc2e"></span>
+    <span class="dot" style="background:#28c840"></span>
+    <span style="margin-left:8px">ops@cluster — KubeGuard: detect → chain → harden</span>
+  </div>
+  <div id="term"><span id="out"></span><span id="cursor"></span></div>
+  <div id="caption"></div>
+  <div id="progress"><div id="bar"></div></div>
+</div>
+<div id="pauseTag">⏸ paused — press Space to resume</div>
+
+<div id="introCard" class="card">
+  <div class="shield">🛡️</div>
+  <div class="wordmark">KubeGuard</div>
+  <div class="tag">Kubernetes attack-surface, posture &amp; compliance — detect, chain, harden</div>
+  <div class="meta">a live command-line walkthrough</div>
+</div>
+
+<div id="outroCard" class="card">
+  <div class="wordmark">KubeGuard</div>
+  <div class="recap">Misconfigs → an ATT&amp;CK attack path → a fix bundle → zero findings.</div>
+  <div class="url">github.com/writetozealdefense-svg/kubeguard</div>
+  <div class="badge">Apache-2.0 · offline-first · read-only · telemetry-free</div>
+</div>
+
+<div id="controls">
+  <div id="panelbox">
+    <h1>KubeGuard</h1>
+    <div class="sub">Turn a pile of Kubernetes misconfigurations into a prioritized, ATT&amp;CK-tagged attack path — and a fix. Narrated CLI demo (~3 min).</div>
+    <button class="big" id="playBtn">▶ Play with voice-over</button>
+    <div class="row">
+      <label><input type="checkbox" id="voiceOn" checked> AI voice-over</label>
+      <select id="voiceSel" title="voice"></select>
+      <label>speed <select id="rateSel"><option>0.9</option><option selected>1</option><option>1.1</option></select></label>
+    </div>
+    <div class="hint">Fullscreen (<kbd>F11</kbd>), start your recorder with <b>desktop audio</b>, press Play.
+      <kbd>Space</kbd> pause/resume · <kbd>R</kbd> restart · <kbd>Esc</kbd> menu.</div>
+  </div>
+</div>
+
+<script>
+/* ── Narrated demo. All terminal output below is REAL, captured from
+     `kubeguard scan/harden` against test/fixtures/vulnerable.yaml. ── */
+
+const BEATS = [
+  {
+    say: "This is a payments workload, about to ship to a Kubernetes cluster. The YAML is valid, the pipeline is green. But valid is not safe. Let's ask KubeGuard what an attacker sees.",
+    caption: "A payments workload. Valid YAML, green pipeline. <em>Valid isn't safe.</em>",
+    steps: [
+      { t: "banner", s: "════════════════════════════════════════════════════════\n  KubeGuard — detect → chain → harden\n════════════════════════════════════════════════════════\n" },
+      { t: "line", cls: "dim", s: "target : test/fixtures/vulnerable.yaml   (a 'checkout' payments app)" },
+      { t: "line", cls: "dim", s: "mode   : offline, read-only — no cluster credentials, no telemetry\n" },
+    ]
+  },
+  {
+    say: "Beat one. Detect. One command reads the manifests and reasons over them. Twenty-one findings — four critical: a privileged container, a host-path mount, and two bindings handing a service account cluster-admin.",
+    caption: "<em>Detect</em>: 21 findings, 4 critical — privileged container, hostPath, cluster-admin bindings.",
+    steps: [
+      { t: "banner", s: "\n════ BEAT 1 — DETECT ════\n" },
+      { t: "cmd",  s: "kubeguard scan -i vulnerable.yaml" },
+      { t: "crit", s: "[critical] KG-001  Privileged container            (Deployment payments/checkout)" },
+      { t: "crit", s: "[critical] KG-002  Sensitive hostPath mount         (Deployment payments/checkout)" },
+      { t: "crit", s: "[critical] KG-011  Binding grants cluster-admin      (ClusterRoleBinding checkout-cluster-admin)" },
+      { t: "high", s: "[high    ] KG-018  Service exposed externally        (Service payments/checkout-lb)" },
+      { t: "high", s: "[high    ] KG-013  RBAC allows reading Secrets        (ClusterRole checkout-power)" },
+      { t: "line", cls: "dim", s: "  … 16 more (high/medium/low) …" },
+      { t: "line", s: "Summary: 21 findings — critical=4 high=7 medium=5 low=5\n" },
+    ]
+  },
+  {
+    say: "Beat two — and this is what sets KubeGuard apart. Chain. It doesn't just list problems; it links them into one ATT&CK-tagged attack path. Internet-facing service, to container escape, to the node, to a harvestable token, to full cluster-admin. That's how a checkout page becomes a cluster takeover.",
+    caption: "<em>Chain</em>: the findings link into one ATT&CK-tagged path — checkout to cluster-admin.",
+    steps: [
+      { t: "banner", s: "\n════ BEAT 2 — CHAIN (the attack path) ════\n" },
+      { t: "crit", s: "[critical] AP-001  Cluster-admin takeover via checkout" },
+      { t: "step", s: "  1. InternetIngress → NetworkReachable   [KG-018 T1190]  Internet-facing Service exposes 'checkout'." },
+      { t: "step", s: "  2. NetworkReachable → ContainerEscape   [KG-001 T1611]  Privileged container allows pod breakout." },
+      { t: "step", s: "  3. ContainerEscape → NodeAccess         [KG-002 T1611]  Breakout yields code-exec on the node." },
+      { t: "step", s: "  4. NodeAccess → ServiceAccountToken     [KG-015 T1552]  'checkout-sa' token is auto-mounted." },
+      { t: "crit", s: "  5. ServiceAccountToken → ClusterAdmin   [KG-011 T1078]  'checkout-sa' is bound to cluster-admin." },
+      { t: "step", s: "  6. ClusterAdmin → LateralMovement       [KG-017 T1021]  No default-deny NetworkPolicy.\n" },
+    ]
+  },
+  {
+    say: "Beat three. Prioritize. Every finding gets a deterministic, explainable score — no black box. The cluster-admin bindings and the privileged container top the list, because they're attack-path enablers, internet-exposed, and blast-radius wide. This is your fix-first list.",
+    caption: "<em>Prioritize</em>: deterministic, explainable scores — your fix-first list, no ML black box.",
+    steps: [
+      { t: "banner", s: "\n════ BEAT 3 — PRIORITIZE (deterministic risk) ════\n" },
+      { t: "cmd",  s: "kubeguard scan -i vulnerable.yaml   # Top risks" },
+      { t: "crit", s: "[score 127] KG-011  Binding grants cluster-admin  (checkout-cluster-admin)" },
+      { t: "line", cls: "dim", s: "     why: severity +50, attack-path-enabler +25, internet-exposed +20, blast-radius +30" },
+      { t: "crit", s: "[score 125] KG-001  Privileged container          (Deployment checkout)" },
+      { t: "high", s: "[score 105] KG-018  Service exposed externally     (Service checkout-lb)" },
+      { t: "line", cls: "dim", s: "     why: severity +30, attack-path-enabler +25, internet-exposed +20, blast-radius +30\n" },
+    ]
+  },
+  {
+    say: "Beat four. Harden. KubeGuard doesn't stop at the diagnosis — it writes the cure. A least-privilege bundle: pod-security, a default-deny network policy, scoped RBAC, admission policies. Apply it, re-scan, and the count goes to zero. Detect, to fix, to proof — one loop.",
+    caption: "<em>Harden</em>: it writes the fix bundle. Apply, re-scan → <em>zero findings</em>.",
+    steps: [
+      { t: "banner", s: "\n════ BEAT 4 — HARDEN → RE-SCAN → ZERO ════\n" },
+      { t: "cmd",  s: "kubeguard harden -o ./bundle" },
+      { t: "line", s: "Wrote 10 files: namespace, default-deny NetworkPolicy, scoped RBAC," },
+      { t: "line", s: "  hardened Deployment, Kyverno + Gatekeeper policies, CHECKLIST.md" },
+      { t: "cmd",  s: "kubeguard scan -i ./bundle" },
+      { t: "ok",   s: "No findings. 0 issues across assessed checks." },
+      { t: "line", cls: "dim", s: "  the same manifests that scored 21 findings now score none.\n" },
+    ]
+  },
+  {
+    say: "Beat five. Prove it to an auditor. The same scan maps every finding to eleven compliance frameworks — C-I-S, N-I-S-T 800-53, P-C-I, I-S-O 27001, and regional ones — honestly labelled as indicative, not a certification. And a fail-on gate returns a non-zero exit, so this blocks a pull request in CI.",
+    caption: "<em>Prove it</em>: 11 compliance frameworks + a CI gate that fails the build.",
+    steps: [
+      { t: "banner", s: "\n════ BEAT 5 — COMPLIANCE + CI GATE ════\n" },
+      { t: "cmd",  s: "kubeguard scan -i vulnerable.yaml   # Compliance (indicative)" },
+      { t: "high", s: "  PCI DSS v4.0                    5 breached of 5 assessed  (0% pass)" },
+      { t: "high", s: "  CIS Kubernetes Benchmark        8 breached of 9 assessed  (11% pass)" },
+      { t: "high", s: "  NIST SP 800-53 Rev. 5           6 breached of 6 assessed  (0% pass)" },
+      { t: "line", cls: "dim", s: "  … ISO 27001, Cyber Essentials, NCSC CAF, UK GDPR, DPDP, NCA, SAMA …" },
+      { t: "cmd",  s: "kubeguard scan -i vulnerable.yaml --fail-on high ; echo $?" },
+      { t: "crit", s: "2      # non-zero → the pull request is blocked\n" },
+    ]
+  },
+  {
+    say: "From a pile of misconfigurations, to a single ATT&CK-tagged attack path, to a fix bundle that scans clean. Offline, read-only, safe to run against production today. KubeGuard. Open source, Apache 2.0.",
+    caption: "Detect. Chain. Harden. <em>Apache-2.0 open source.</em>",
+    steps: [
+      { t: "banner", s: "\n════════════════════════════════════════════════════════\n  detect → chain → harden\n  github.com/writetozealdefense-svg/kubeguard\n════════════════════════════════════════════════════════\n" },
+    ]
+  },
+];
+
+/* ── engine (shared with the CipherFlow player) ── */
+const out = document.getElementById('out'), cap = document.getElementById('caption'),
+      bar = document.getElementById('bar'), controls = document.getElementById('controls'),
+      term = document.getElementById('term');
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+let playing = false, paused = false;
+async function gate(){ while (paused && playing) await sleep(60); }
+async function psleep(ms){ let e = 0; while (e < ms && playing){ await sleep(40); if (!paused) e += 40; } }
+
+function esc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
+function append(html){ out.insertAdjacentHTML('beforeend', html); term.scrollTop = term.scrollHeight; }
+
+async function typeCmd(s){
+  append('<span class="prompt">ops@cluster:~$ </span>');
+  for (const ch of s){ await gate(); append(esc(ch)); await sleep(1000/34); }
+  append('\n'); await psleep(260);
+}
+async function playSteps(steps){
+  for (const st of steps){
+    await gate();
+    if (st.t === 'cmd')      await typeCmd(st.s);
+    else if (st.t === 'banner'){ append('<span class="banner">'+esc(st.s)+'</span>\n'); await psleep(320); }
+    else { append('<span class="'+(st.cls||'')+'">'+esc(st.s)+'</span>\n'); await psleep(300); }
+  }
+}
+
+function pickVoice(){
+  const sel = document.getElementById('voiceSel');
+  return speechSynthesis.getVoices().find(v => v.name === sel.value) || null;
+}
+function speak(text){
+  return new Promise(res => {
+    if (!document.getElementById('voiceOn').checked || !('speechSynthesis' in window)) return res();
+    const u = new SpeechSynthesisUtterance(text);
+    const v = pickVoice(); if (v) u.voice = v;
+    u.rate = parseFloat(document.getElementById('rateSel').value);
+    u.onend = res; u.onerror = res;
+    speechSynthesis.speak(u);
+  });
+}
+
+const showCard = id => document.getElementById(id).classList.add('show');
+const hideCard = id => document.getElementById(id).classList.remove('show');
+function hideCards(){ hideCard('introCard'); hideCard('outroCard'); }
+
+async function run(){
+  playing = true; paused = false; out.innerHTML = ''; cap.innerHTML = ''; bar.style.width = '0%';
+  document.getElementById('pauseTag').classList.remove('show'); hideCards();
+
+  showCard('introCard'); await psleep(3600); if (!playing) return;
+  hideCard('introCard'); await psleep(650);
+
+  const content = BEATS.slice(0, -1);
+  for (let i = 0; i < content.length && playing; i++){
+    const b = content[i];
+    cap.innerHTML = b.caption;
+    const narration = speak(b.say);
+    await playSteps(b.steps);
+    await narration;
+    bar.style.width = Math.round(100*(i+1)/BEATS.length) + '%';
+    await psleep(550);
+  }
+
+  if (playing){
+    const close = BEATS[BEATS.length - 1];
+    cap.innerHTML = '';
+    showCard('outroCard');
+    bar.style.width = '100%';
+    await speak(close.say);
+    await psleep(1600);
+  }
+}
+
+function populateVoices(){
+  const sel = document.getElementById('voiceSel');
+  const vs = speechSynthesis.getVoices().filter(v => v.lang.startsWith('en'));
+  vs.sort((a,b) => (b.name.includes('Natural')||b.name.includes('Online')) - (a.name.includes('Natural')||a.name.includes('Online')));
+  sel.innerHTML = vs.map(v => `<option>${v.name}</option>`).join('');
+}
+if ('speechSynthesis' in window){ populateVoices(); speechSynthesis.onvoiceschanged = populateVoices; }
+
+document.getElementById('playBtn').onclick = () => { controls.classList.add('hidden'); run(); };
+addEventListener('keydown', e => {
+  if (e.key === ' ' || e.code === 'Space'){
+    e.preventDefault(); if (!playing) return;
+    paused = !paused;
+    document.getElementById('pauseTag').classList.toggle('show', paused);
+    if (paused) speechSynthesis.pause(); else speechSynthesis.resume();
+  }
+  if (e.key === 'Escape'){ playing = false; paused = false; speechSynthesis.cancel(); hideCards(); document.getElementById('pauseTag').classList.remove('show'); controls.classList.remove('hidden'); }
+  if (e.key === 'r' || e.key === 'R'){ playing = false; paused = false; speechSynthesis.cancel(); hideCards(); document.getElementById('pauseTag').classList.remove('show'); setTimeout(()=>{ controls.classList.add('hidden'); run(); }, 60); }
+});
+</script>
+</body>
+</html>
