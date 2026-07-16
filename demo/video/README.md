@@ -34,7 +34,7 @@ the dropdown before playing — they sound far better than the built-in ones.
 | 2 · Chain  | (same scan) | one **ATT&CK-tagged attack path**: checkout → cluster-admin, 6 hops with T-numbers |
 | 3 · Prioritize | (same scan) | deterministic, **explainable** risk scores — the fix-first list |
 | 4 · Harden | `kubeguard harden -o ./bundle` → re-scan | writes a least-privilege bundle; re-scan → **No findings** |
-| 5 · Prove | `--fail-on high` | 11 compliance frameworks + a **non-zero CI exit** that blocks the PR |
+| 5 · Prove | `--fail-on high` | 12 compliance frameworks incl. **GCC: NCA ECC-1, NCA CCC, SAMA CSF, UAE NESA** (honest denominators) + a **non-zero CI exit** that blocks the PR |
 
 Beat 2 is the money shot — most scanners list findings; KubeGuard *chains* them
 into a single narrated attack path an executive immediately understands.

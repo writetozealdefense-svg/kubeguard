@@ -194,15 +194,17 @@ const BEATS = [
     ]
   },
   {
-    say: "Beat five. Prove it to an auditor. The same scan maps every finding to eleven compliance frameworks — C-I-S, N-I-S-T 800-53, P-C-I, I-S-O 27001, and regional ones — honestly labelled as indicative, not a certification. And a fail-on gate returns a non-zero exit, so this blocks a pull request in CI.",
-    caption: "<em>Prove it</em>: 11 compliance frameworks + a CI gate that fails the build.",
+    say: "Beat five. Prove it to a Saudi financial regulator. The same scan maps every finding to twelve compliance frameworks — including the ones a G-C-C auditor asks for: N-C-A Essential Controls, N-C-A Cloud Controls, and the SAMA framework. Everything is labelled indicative guidance, not a certification, and governance controls a scan can't check are declared non-assessable — so the numbers never overstate coverage. And a fail-on gate returns a non-zero exit, blocking the pull request in C-I.",
+    caption: "<em>Prove it to a GCC auditor</em>: NCA ECC + NCA CCC + SAMA CSF, honest denominators + CI gate.",
     steps: [
-      { t: "banner", s: "\n════ BEAT 5 — COMPLIANCE + CI GATE ════\n" },
+      { t: "banner", s: "\n════ BEAT 5 — GCC COMPLIANCE + CI GATE ════\n" },
       { t: "cmd",  s: "kubeguard scan -i vulnerable.yaml   # Compliance (indicative)" },
-      { t: "high", s: "  PCI DSS v4.0                    5 breached of 5 assessed  (0% pass)" },
-      { t: "high", s: "  CIS Kubernetes Benchmark        8 breached of 9 assessed  (11% pass)" },
-      { t: "high", s: "  NIST SP 800-53 Rev. 5           6 breached of 6 assessed  (0% pass)" },
-      { t: "line", cls: "dim", s: "  … ISO 27001, Cyber Essentials, NCSC CAF, UK GDPR, DPDP, NCA, SAMA …" },
+      { t: "high", s: "  Saudi NCA Cloud Cybersecurity Controls (CCC-1)     5 breached of 5 assessed  (0% pass)" },
+      { t: "high", s: "  Saudi NCA Essential Cybersecurity Controls (ECC-1) 4 breached of 4 assessed  (0% pass)" },
+      { t: "high", s: "  SAMA Cyber Security Framework (Saudi Central Bank) 4 breached of 4 assessed  (0% pass)" },
+      { t: "high", s: "  UAE Information Assurance Standards (NESA)         4 breached of 4 assessed  (0% pass)" },
+      { t: "line", cls: "dim", s: "  … + CIS, ISO 27001, PCI DSS, NIST 800-53, NCSC CAF, UK GDPR, DPDP  (12 total)" },
+      { t: "line", cls: "dim", s: "  governance / logging controls declared non-assessable — honest denominator" },
       { t: "cmd",  s: "kubeguard scan -i vulnerable.yaml --fail-on high ; echo $?" },
       { t: "crit", s: "2      # non-zero → the pull request is blocked\n" },
     ]
