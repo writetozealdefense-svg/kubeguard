@@ -15,6 +15,9 @@ controls:
     title: Networks Security Management
     mapsTo: ["KG-003", "KG-017", "KG-018"]
     assessable: true
+  # REVIEW: in ECC-1:2018 "Data and Information Protection" is subdomain 2-7;
+  # 2-15 is "Web Application Security". The mapping intent is data protection —
+  # verify and likely correct the id to 2-7 against the official ECC-1:2018.
   - id: "2-15"
     title: Data and Information Protection
     mapsTo: ["KG-013", "KG-015"]

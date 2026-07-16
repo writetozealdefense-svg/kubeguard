@@ -15,16 +15,23 @@ controls:
     title: Infrastructure Security
     mapsTo: ["KG-001", "KG-002", "KG-004", "KG-005", "KG-008"]
     assessable: true
+  # REVIEW: verify 3.3.9 is "Network Security" (not "Cryptography") in the
+  # official SAMA CSF v1.0; the mapping is defensible either way but the
+  # id/title pairing must match the framework.
   - id: "3.3.9"
     title: Network Security
     mapsTo: ["KG-003", "KG-017", "KG-018"]
     assessable: true
   # Governance/process domains have no declarative Kubernetes signal; declared
   # non-assessable so they never inflate or deflate the honest denominator.
+  # REVIEW: confirm 3.3 extends to .16 in SAMA CSF v1.0; event management may
+  # sit at a lower index.
   - id: "3.3.16"
     title: Cyber Security Event Management
     mapsTo: []
     assessable: false
+  # REVIEW: "Cyber Security Reviews" may belong under the 3.2 Risk Management &
+  # Compliance domain rather than 3.3 Operations — verify placement.
   - id: "3.3.17"
     title: Cyber Security Reviews
     mapsTo: []
