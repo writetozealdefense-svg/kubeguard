@@ -76,8 +76,8 @@ func TestServeScanAndPosture(t *testing.T) {
 	if body.Posture.ControlsAssessed == 0 || body.Posture.ControlsBreached == 0 {
 		t.Errorf("vulnerable posture should have assessed + breached controls: %+v", body.Posture)
 	}
-	if len(body.Compliance) != 11 {
-		t.Errorf("expected 11 frameworks, got %d", len(body.Compliance))
+	if len(body.Compliance) != 12 {
+		t.Errorf("expected 12 frameworks, got %d", len(body.Compliance))
 	}
 
 	// Findings endpoint.

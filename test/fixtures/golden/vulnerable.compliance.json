@@ -200,6 +200,67 @@
     "disclaimer": "Indicative mapping to KubeGuard checks only; not an ISO certification or audit."
   },
   {
+    "framework": "Saudi NCA Cloud Cybersecurity Controls (CCC-1)",
+    "version": "2020",
+    "assessed": 5,
+    "breached": 5,
+    "passed": 0,
+    "passRate": 0,
+    "breaches": [
+      {
+        "controlId": "2-2",
+        "title": "Identity and Access Management",
+        "findings": [
+          "KG-011",
+          "KG-012",
+          "KG-013",
+          "KG-014",
+          "KG-015"
+        ]
+      },
+      {
+        "controlId": "2-3",
+        "title": "Information System and Processing Facilities Protection",
+        "findings": [
+          "KG-001",
+          "KG-002",
+          "KG-006",
+          "KG-007",
+          "KG-008",
+          "KG-009",
+          "KG-020",
+          "KG-021"
+        ]
+      },
+      {
+        "controlId": "2-5",
+        "title": "Networks Security Management",
+        "findings": [
+          "KG-003",
+          "KG-017",
+          "KG-018"
+        ]
+      },
+      {
+        "controlId": "2-7",
+        "title": "Data and Information Protection",
+        "findings": [
+          "KG-013",
+          "KG-015"
+        ]
+      },
+      {
+        "controlId": "2-10",
+        "title": "Vulnerability and Cloud Image/Registry Management",
+        "findings": [
+          "KG-019",
+          "KG-022"
+        ]
+      }
+    ],
+    "disclaimer": "Indicative mapping to KubeGuard checks only; not an NCA assessment or accreditation. Control identifiers follow the NCA CCC domain structure and map at the domain level; verify against the official NCA Cloud Cybersecurity Controls (CCC-1:2020) before regulator use."
+  },
+  {
     "framework": "Saudi NCA Essential Cybersecurity Controls (ECC-1)",
     "version": "2018",
     "assessed": 4,

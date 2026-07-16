@@ -1945,6 +1945,832 @@
     "generatedAt": "2026-01-01T00:00:00Z",
     "source": "vulnerable.yaml",
     "profile": "zeal-default",
+    "id": "nca-ccc",
+    "framework": "Saudi NCA Cloud Cybersecurity Controls (CCC-1)",
+    "version": "2020",
+    "assessed": 5,
+    "breached": 5,
+    "passed": 0,
+    "passRate": 0,
+    "controls": [
+      {
+        "controlId": "2-2",
+        "title": "Identity and Access Management",
+        "mapsTo": [
+          "KG-011",
+          "KG-012",
+          "KG-013",
+          "KG-014",
+          "KG-015",
+          "KG-016"
+        ],
+        "breached": true,
+        "findings": [
+          {
+            "id": "KG-011",
+            "title": "Binding grants cluster-admin to a ServiceAccount or group",
+            "severity": "critical",
+            "category": "rbac",
+            "resource": {
+              "kind": "ClusterRoleBinding",
+              "name": "checkout-cluster-admin"
+            },
+            "evidence": [
+              {
+                "path": "roleRef",
+                "value": "cluster-admin"
+              }
+            ],
+            "remediation": {
+              "summary": "Bind a least-privilege Role instead of cluster-admin or a wildcard ClusterRole.",
+              "snippet": "# bind a least-privilege Role, not cluster-admin or a wildcard ClusterRole"
+            },
+            "grants": [
+              "ClusterAdmin"
+            ],
+            "refs": [
+              {
+                "framework": "CIS",
+                "id": "5.1.1"
+              },
+              {
+                "framework": "NSA",
+                "id": "k8s-hardening",
+                "title": "RBAC"
+              },
+              {
+                "framework": "ATT\u0026CK",
+                "id": "T1078"
+              }
+            ]
+          },
+          {
+            "id": "KG-011",
+            "title": "Binding grants cluster-admin to a ServiceAccount or group",
+            "severity": "critical",
+            "category": "rbac",
+            "resource": {
+              "kind": "ClusterRoleBinding",
+              "name": "checkout-power-binding"
+            },
+            "evidence": [
+              {
+                "path": "roleRef",
+                "value": "wildcard ClusterRole checkout-power"
+              }
+            ],
+            "remediation": {
+              "summary": "Bind a least-privilege Role instead of cluster-admin or a wildcard ClusterRole.",
+              "snippet": "# bind a least-privilege Role, not cluster-admin or a wildcard ClusterRole"
+            },
+            "grants": [
+              "ClusterAdmin"
+            ],
+            "refs": [
+              {
+                "framework": "CIS",
+                "id": "5.1.1"
+              },
+              {
+                "framework": "NSA",
+                "id": "k8s-hardening",
+                "title": "RBAC"
+              },
+              {
+                "framework": "ATT\u0026CK",
+                "id": "T1078"
+              }
+            ]
+          },
+          {
+            "id": "KG-012",
+            "title": "Wildcard RBAC rule",
+            "severity": "high",
+            "category": "rbac",
+            "resource": {
+              "kind": "ClusterRole",
+              "name": "checkout-power"
+            },
+            "evidence": [
+              {
+                "path": "rules[].verbs|resources|apiGroups",
+                "value": "*"
+              }
+            ],
+            "remediation": {
+              "summary": "Replace wildcard apiGroups/resources/verbs with the specific values required.",
+              "snippet": "# replace wildcard rules with explicit apiGroups/resources/verbs"
+            },
+            "grants": [
+              "BroadAPIAccess"
+            ],
+            "refs": [
+              {
+                "framework": "CIS",
+                "id": "5.1.3"
+              },
+              {
+                "framework": "NSA",
+                "id": "k8s-hardening",
+                "title": "RBAC"
+              }
+            ]
+          },
+          {
+            "id": "KG-013",
+            "title": "RBAC allows reading Secrets",
+            "severity": "high",
+            "category": "rbac",
+            "resource": {
+              "kind": "ClusterRole",
+              "name": "checkout-power"
+            },
+            "evidence": [
+              {
+                "path": "rules[]",
+                "value": "get/list/watch on secrets"
+              }
+            ],
+            "remediation": {
+              "summary": "Remove get/list/watch on secrets; scope to named resourceNames if unavoidable.",
+              "snippet": "# remove get/list/watch on secrets; scope via resourceNames if required"
+            },
+            "grants": [
+              "SecretRead"
+            ],
+            "refs": [
+              {
+                "framework": "CIS",
+                "id": "5.1.2"
+              },
+              {
+                "framework": "NSA",
+                "id": "k8s-hardening",
+                "title": "RBAC"
+              },
+              {
+                "framework": "ATT\u0026CK",
+                "id": "T1552"
+              }
+            ]
+          },
+          {
+            "id": "KG-014",
+            "title": "RBAC allows creating or exec-ing into pods",
+            "severity": "high",
+            "category": "rbac",
+            "resource": {
+              "kind": "ClusterRole",
+              "name": "checkout-power"
+            },
+            "evidence": [
+              {
+                "path": "rules[]",
+                "value": "create pods / pods exec"
+              }
+            ],
+            "remediation": {
+              "summary": "Remove create on pods and access to pods/exec \u0026 pods/attach.",
+              "snippet": "# remove create on pods and access to pods/exec and pods/attach"
+            },
+            "grants": [
+              "PodCreate"
+            ],
+            "refs": [
+              {
+                "framework": "CIS",
+                "id": "5.1.4"
+              },
+              {
+                "framework": "NSA",
+                "id": "k8s-hardening",
+                "title": "RBAC"
+              },
+              {
+                "framework": "ATT\u0026CK",
+                "id": "T1610"
+              }
+            ]
+          },
+          {
+            "id": "KG-015",
+            "title": "ServiceAccount token auto-mounted",
+            "severity": "medium",
+            "category": "rbac",
+            "resource": {
+              "kind": "Deployment",
+              "namespace": "payments",
+              "name": "checkout"
+            },
+            "evidence": [
+              {
+                "path": "spec.automountServiceAccountToken",
+                "value": "not disabled"
+              }
+            ],
+            "remediation": {
+              "summary": "Set automountServiceAccountToken: false on the pod or ServiceAccount when the token is not needed.",
+              "snippet": "spec:\n  automountServiceAccountToken: false"
+            },
+            "grants": [
+              "ServiceAccountToken"
+            ],
+            "refs": [
+              {
+                "framework": "CIS",
+                "id": "5.1.6"
+              },
+              {
+                "framework": "NSA",
+                "id": "k8s-hardening",
+                "title": "RBAC"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "controlId": "2-3",
+        "title": "Information System and Processing Facilities Protection",
+        "mapsTo": [
+          "KG-001",
+          "KG-002",
+          "KG-006",
+          "KG-007",
+          "KG-008",
+          "KG-009",
+          "KG-020",
+          "KG-021"
+        ],
+        "breached": true,
+        "findings": [
+          {
+            "id": "KG-001",
+            "title": "Privileged container",
+            "severity": "critical",
+            "category": "host-access",
+            "resource": {
+              "kind": "Deployment",
+              "namespace": "payments",
+              "name": "checkout"
+            },
+            "evidence": [
+              {
+                "path": "spec.containers[checkout].securityContext.privileged",
+                "value": "true"
+              }
+            ],
+            "remediation": {
+              "summary": "Remove securityContext.privileged or set it to false; grant only the specific capabilities the workload needs.",
+              "snippet": "securityContext:\n  privileged: false"
+            },
+            "grants": [
+              "ContainerEscape",
+              "NodeAccess"
+            ],
+            "refs": [
+              {
+                "framework": "CIS",
+                "id": "5.2.1"
+              },
+              {
+                "framework": "NSA",
+                "id": "k8s-hardening",
+                "title": "Pod security"
+              },
+              {
+                "framework": "ATT\u0026CK",
+                "id": "T1611"
+              }
+            ]
+          },
+          {
+            "id": "KG-002",
+            "title": "Sensitive hostPath mount",
+            "severity": "critical",
+            "category": "host-access",
+            "resource": {
+              "kind": "Deployment",
+              "namespace": "payments",
+              "name": "checkout"
+            },
+            "evidence": [
+              {
+                "path": "spec.volumes[docker-sock].hostPath.path",
+                "value": "/var/run/docker.sock"
+              }
+            ],
+            "remediation": {
+              "summary": "Remove the hostPath volume; use a projected/ephemeral volume or a CSI driver instead of mounting host paths or runtime sockets.",
+              "snippet": "# remove the hostPath volume; use a CSI or projected volume instead"
+            },
+            "grants": [
+              "HostFilesystemAccess",
+              "ContainerEscape"
+            ],
+            "refs": [
+              {
+                "framework": "CIS",
+                "id": "5.2.10"
+              },
+              {
+                "framework": "NSA",
+                "id": "k8s-hardening",
+                "title": "Pod security"
+              },
+              {
+                "framework": "ATT\u0026CK",
+                "id": "T1611"
+              }
+            ]
+          },
+          {
+            "id": "KG-006",
+            "title": "Container may run as root",
+            "severity": "medium",
+            "category": "workload-hardening",
+            "resource": {
+              "kind": "Deployment",
+              "namespace": "payments",
+              "name": "checkout"
+            },
+            "evidence": [
+              {
+                "path": "spec.containers[checkout].securityContext.runAsNonRoot",
+                "value": "not enforced"
+              }
+            ],
+            "remediation": {
+              "summary": "Set runAsNonRoot: true and a non-zero runAsUser in the security context.",
+              "snippet": "securityContext:\n  runAsNonRoot: true\n  runAsUser: 1000"
+            },
+            "grants": [
+              "RootInContainer"
+            ],
+            "refs": [
+              {
+                "framework": "CIS",
+                "id": "5.2.6"
+              },
+              {
+                "framework": "NSA",
+                "id": "k8s-hardening",
+                "title": "Pod security"
+              }
+            ]
+          },
+          {
+            "id": "KG-007",
+            "title": "Privilege escalation not disabled",
+            "severity": "medium",
+            "category": "workload-hardening",
+            "resource": {
+              "kind": "Deployment",
+              "namespace": "payments",
+              "name": "checkout"
+            },
+            "evidence": [
+              {
+                "path": "spec.containers[checkout].securityContext.allowPrivilegeEscalation",
+                "value": "not set (defaults true)"
+              }
+            ],
+            "remediation": {
+              "summary": "Set allowPrivilegeEscalation: false in the container security context.",
+              "snippet": "securityContext:\n  allowPrivilegeEscalation: false"
+            },
+            "grants": [
+              "PrivEscWithinContainer"
+            ],
+            "refs": [
+              {
+                "framework": "CIS",
+                "id": "5.2.5"
+              },
+              {
+                "framework": "NSA",
+                "id": "k8s-hardening",
+                "title": "Pod security"
+              }
+            ]
+          },
+          {
+            "id": "KG-008",
+            "title": "Dangerous Linux capability added",
+            "severity": "high",
+            "category": "workload-hardening",
+            "resource": {
+              "kind": "Deployment",
+              "namespace": "payments",
+              "name": "checkout"
+            },
+            "evidence": [
+              {
+                "path": "spec.containers[checkout].securityContext.capabilities.add",
+                "value": "SYS_ADMIN"
+              }
+            ],
+            "remediation": {
+              "summary": "Drop ALL capabilities and add back only those strictly required.",
+              "snippet": "securityContext:\n  capabilities:\n    drop: [\"ALL\"]"
+            },
+            "grants": [
+              "ContainerEscape"
+            ],
+            "refs": [
+              {
+                "framework": "CIS",
+                "id": "5.2.8"
+              },
+              {
+                "framework": "NSA",
+                "id": "k8s-hardening",
+                "title": "Pod security"
+              },
+              {
+                "framework": "ATT\u0026CK",
+                "id": "T1611"
+              }
+            ]
+          },
+          {
+            "id": "KG-009",
+            "title": "Root filesystem is writable",
+            "severity": "low",
+            "category": "workload-hardening",
+            "resource": {
+              "kind": "Deployment",
+              "namespace": "payments",
+              "name": "checkout"
+            },
+            "evidence": [
+              {
+                "path": "spec.containers[checkout].securityContext.readOnlyRootFilesystem",
+                "value": "not true"
+              }
+            ],
+            "remediation": {
+              "summary": "Set readOnlyRootFilesystem: true and mount writable paths as volumes.",
+              "snippet": "securityContext:\n  readOnlyRootFilesystem: true"
+            },
+            "refs": [
+              {
+                "framework": "CIS",
+                "id": "5.2.12"
+              },
+              {
+                "framework": "NSA",
+                "id": "k8s-hardening",
+                "title": "Pod security"
+              }
+            ]
+          },
+          {
+            "id": "KG-020",
+            "title": "Seccomp profile is not RuntimeDefault",
+            "severity": "low",
+            "category": "workload-hardening",
+            "resource": {
+              "kind": "Deployment",
+              "namespace": "payments",
+              "name": "checkout"
+            },
+            "evidence": [
+              {
+                "path": "spec.containers[checkout].securityContext.seccompProfile.type",
+                "value": "not RuntimeDefault"
+              }
+            ],
+            "remediation": {
+              "summary": "Set seccompProfile.type: RuntimeDefault on the pod or container.",
+              "snippet": "securityContext:\n  seccompProfile:\n    type: RuntimeDefault"
+            },
+            "refs": [
+              {
+                "framework": "CIS",
+                "id": "5.7.2"
+              },
+              {
+                "framework": "NSA",
+                "id": "k8s-hardening",
+                "title": "Pod security"
+              }
+            ]
+          },
+          {
+            "id": "KG-021",
+            "title": "Container does not drop all capabilities",
+            "severity": "medium",
+            "category": "workload-hardening",
+            "resource": {
+              "kind": "Deployment",
+              "namespace": "payments",
+              "name": "checkout"
+            },
+            "evidence": [
+              {
+                "path": "spec.containers[checkout].securityContext.capabilities.drop",
+                "value": "does not drop ALL"
+              }
+            ],
+            "remediation": {
+              "summary": "Set securityContext.capabilities.drop: [\"ALL\"] and add back only the capabilities the workload strictly requires (Pod Security \"restricted\")."
+            },
+            "refs": [
+              {
+                "framework": "CIS",
+                "id": "5.2.9"
+              },
+              {
+                "framework": "NSA",
+                "id": "k8s-hardening",
+                "title": "Pod security"
+              },
+              {
+                "framework": "PSA",
+                "id": "restricted"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "controlId": "2-5",
+        "title": "Networks Security Management",
+        "mapsTo": [
+          "KG-003",
+          "KG-017",
+          "KG-018"
+        ],
+        "breached": true,
+        "findings": [
+          {
+            "id": "KG-003",
+            "title": "hostNetwork enabled",
+            "severity": "high",
+            "category": "host-access",
+            "resource": {
+              "kind": "Deployment",
+              "namespace": "payments",
+              "name": "checkout"
+            },
+            "evidence": [
+              {
+                "path": "spec.hostNetwork",
+                "value": "true"
+              }
+            ],
+            "remediation": {
+              "summary": "Set hostNetwork: false; expose the workload via a Service instead.",
+              "snippet": "spec:\n  hostNetwork: false"
+            },
+            "grants": [
+              "HostNetworkAccess"
+            ],
+            "refs": [
+              {
+                "framework": "CIS",
+                "id": "5.2.4"
+              },
+              {
+                "framework": "NSA",
+                "id": "k8s-hardening",
+                "title": "Pod security"
+              }
+            ]
+          },
+          {
+            "id": "KG-017",
+            "title": "Namespace has no default-deny NetworkPolicy",
+            "severity": "medium",
+            "category": "network",
+            "resource": {
+              "kind": "Namespace",
+              "name": "payments"
+            },
+            "evidence": [
+              {
+                "path": "networkpolicies",
+                "value": "no default-deny in namespace"
+              }
+            ],
+            "remediation": {
+              "summary": "Apply a default-deny NetworkPolicy (empty podSelector, Ingress+Egress) and allow only required flows.",
+              "snippet": "# apply a default-deny NetworkPolicy (see `kubeguard harden`)"
+            },
+            "grants": [
+              "LateralMovement"
+            ],
+            "refs": [
+              {
+                "framework": "CIS",
+                "id": "5.3.2"
+              },
+              {
+                "framework": "NSA",
+                "id": "k8s-hardening",
+                "title": "Network separation"
+              }
+            ]
+          },
+          {
+            "id": "KG-018",
+            "title": "Service exposed externally",
+            "severity": "high",
+            "category": "exposure",
+            "resource": {
+              "kind": "Service",
+              "namespace": "payments",
+              "name": "checkout-lb"
+            },
+            "evidence": [
+              {
+                "path": "spec.type",
+                "value": "LoadBalancer"
+              }
+            ],
+            "remediation": {
+              "summary": "Avoid direct LoadBalancer/NodePort exposure; front workloads with an ingress + WAF and restrict source ranges.",
+              "snippet": "spec:\n  type: ClusterIP   # front with an ingress + WAF instead"
+            },
+            "grants": [
+              "InternetIngress"
+            ],
+            "refs": [
+              {
+                "framework": "NSA",
+                "id": "k8s-hardening",
+                "title": "Network separation"
+              },
+              {
+                "framework": "ATT\u0026CK",
+                "id": "T1190"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "controlId": "2-7",
+        "title": "Data and Information Protection",
+        "mapsTo": [
+          "KG-013",
+          "KG-015"
+        ],
+        "breached": true,
+        "findings": [
+          {
+            "id": "KG-013",
+            "title": "RBAC allows reading Secrets",
+            "severity": "high",
+            "category": "rbac",
+            "resource": {
+              "kind": "ClusterRole",
+              "name": "checkout-power"
+            },
+            "evidence": [
+              {
+                "path": "rules[]",
+                "value": "get/list/watch on secrets"
+              }
+            ],
+            "remediation": {
+              "summary": "Remove get/list/watch on secrets; scope to named resourceNames if unavoidable.",
+              "snippet": "# remove get/list/watch on secrets; scope via resourceNames if required"
+            },
+            "grants": [
+              "SecretRead"
+            ],
+            "refs": [
+              {
+                "framework": "CIS",
+                "id": "5.1.2"
+              },
+              {
+                "framework": "NSA",
+                "id": "k8s-hardening",
+                "title": "RBAC"
+              },
+              {
+                "framework": "ATT\u0026CK",
+                "id": "T1552"
+              }
+            ]
+          },
+          {
+            "id": "KG-015",
+            "title": "ServiceAccount token auto-mounted",
+            "severity": "medium",
+            "category": "rbac",
+            "resource": {
+              "kind": "Deployment",
+              "namespace": "payments",
+              "name": "checkout"
+            },
+            "evidence": [
+              {
+                "path": "spec.automountServiceAccountToken",
+                "value": "not disabled"
+              }
+            ],
+            "remediation": {
+              "summary": "Set automountServiceAccountToken: false on the pod or ServiceAccount when the token is not needed.",
+              "snippet": "spec:\n  automountServiceAccountToken: false"
+            },
+            "grants": [
+              "ServiceAccountToken"
+            ],
+            "refs": [
+              {
+                "framework": "CIS",
+                "id": "5.1.6"
+              },
+              {
+                "framework": "NSA",
+                "id": "k8s-hardening",
+                "title": "RBAC"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "controlId": "2-10",
+        "title": "Vulnerability and Cloud Image/Registry Management",
+        "mapsTo": [
+          "KG-019",
+          "KG-022"
+        ],
+        "breached": true,
+        "findings": [
+          {
+            "id": "KG-019",
+            "title": "Image uses a mutable tag",
+            "severity": "low",
+            "category": "supply-chain",
+            "resource": {
+              "kind": "Deployment",
+              "namespace": "payments",
+              "name": "checkout"
+            },
+            "evidence": [
+              {
+                "path": "spec.containers[checkout].image",
+                "value": "checkout:latest"
+              }
+            ],
+            "remediation": {
+              "summary": "Pin images by digest (image@sha256:...) or an immutable, versioned tag.",
+              "snippet": "image: \u003crepo\u003e@sha256:\u003cdigest\u003e   # pin by digest"
+            },
+            "refs": [
+              {
+                "framework": "CIS",
+                "id": "5.5.1"
+              },
+              {
+                "framework": "NSA",
+                "id": "k8s-hardening",
+                "title": "Supply chain"
+              }
+            ]
+          },
+          {
+            "id": "KG-022",
+            "title": "Image pulled from an implicit or untrusted registry",
+            "severity": "low",
+            "category": "supply-chain",
+            "resource": {
+              "kind": "Deployment",
+              "namespace": "payments",
+              "name": "checkout"
+            },
+            "evidence": [
+              {
+                "path": "spec.containers[checkout].image",
+                "value": "checkout:latest"
+              }
+            ],
+            "remediation": {
+              "summary": "Pull images from an explicit, trusted registry (e.g. registry.example.com/…) rather than an implicit Docker Hub reference, and enforce it with an admission policy."
+            },
+            "refs": [
+              {
+                "framework": "NSA",
+                "id": "k8s-hardening",
+                "title": "Supply chain"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "disclaimer": "Indicative mapping to KubeGuard checks only; not an NCA assessment or accreditation. Control identifiers follow the NCA CCC domain structure and map at the domain level; verify against the official NCA Cloud Cybersecurity Controls (CCC-1:2020) before regulator use."
+  },
+  {
+    "generatedAt": "2026-01-01T00:00:00Z",
+    "source": "vulnerable.yaml",
+    "profile": "zeal-default",
     "id": "nca-ecc-1",
     "framework": "Saudi NCA Essential Cybersecurity Controls (ECC-1)",
     "version": "2018",

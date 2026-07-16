@@ -16,7 +16,7 @@ func TestAnalyzeVulnerable(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Analyze: %v", err)
 	}
-	if len(rep.Findings) == 0 || len(rep.Paths) == 0 || len(rep.Compliance) != 11 {
+	if len(rep.Findings) == 0 || len(rep.Paths) == 0 || len(rep.Compliance) != 12 {
 		t.Errorf("unexpected report: findings=%d paths=%d frameworks=%d",
 			len(rep.Findings), len(rep.Paths), len(rep.Compliance))
 	}

@@ -1,0 +1,54 @@
+# Saudi NCA Cloud Cybersecurity Controls (CCC-1) — indicative KubeGuard mapping.
+#
+# CCC follows the ECC four-domain structure (1 Governance, 2 Defence,
+# 3 Resilience, 4 Third-Party & Cloud) with cloud-specific additions. The control
+# identifiers below map at the DOMAIN level and MUST be verified against the
+# official NCA Cloud Cybersecurity Controls document (CCC-1:2020) before any
+# regulator-facing use — see the `# REVIEW` notes. Governance, contractual, and
+# runtime-only controls that KubeGuard cannot evidence declaratively are declared
+# non-assessable so they never distort the honest denominator.
+id: nca-ccc
+title: Saudi NCA Cloud Cybersecurity Controls (CCC-1)
+version: "2020"
+disclaimer: "Indicative mapping to KubeGuard checks only; not an NCA assessment or accreditation. Control identifiers follow the NCA CCC domain structure and map at the domain level; verify against the official NCA Cloud Cybersecurity Controls (CCC-1:2020) before regulator use."
+controls:
+  # --- Domain 2: Cybersecurity Defence (declaratively assessable by KubeGuard) ---
+  - id: "2-2"
+    title: Identity and Access Management
+    mapsTo: ["KG-011", "KG-012", "KG-013", "KG-014", "KG-015", "KG-016"]
+    assessable: true
+  - id: "2-3"
+    title: Information System and Processing Facilities Protection
+    # REVIEW: confirm subdomain number for workload/host protection vs official CCC-1:2020
+    mapsTo: ["KG-001", "KG-002", "KG-006", "KG-007", "KG-008", "KG-009", "KG-020", "KG-021"]
+    assessable: true
+  - id: "2-5"
+    title: Networks Security Management
+    mapsTo: ["KG-003", "KG-017", "KG-018"]
+    assessable: true
+  - id: "2-7"
+    title: Data and Information Protection
+    # REVIEW: confirm data-protection subdomain number vs official CCC-1:2020
+    mapsTo: ["KG-013", "KG-015"]
+    assessable: true
+  - id: "2-10"
+    title: Vulnerability and Cloud Image/Registry Management
+    # REVIEW: confirm mapping of image provenance/registry hygiene to the correct
+    # CCC cloud subdomain (vulnerability mgmt vs a cloud-specific supply-chain control)
+    mapsTo: ["KG-019", "KG-022"]
+    assessable: true
+  # --- Non-assessable: no declarative Kubernetes signal (kept honest) ---
+  - id: "1-1"
+    title: Cybersecurity Governance
+    mapsTo: []
+    assessable: false
+  - id: "2-12"
+    title: Cybersecurity Event Logs and Monitoring
+    # Runtime/log-time control; KubeGuard is config-time posture, not a log source.
+    mapsTo: []
+    assessable: false
+  - id: "4-1"
+    title: Third-Party and Cloud Computing Cybersecurity
+    # Contractual / CSP-side shared-responsibility control; not evidenced by a manifest scan.
+    mapsTo: []
+    assessable: false

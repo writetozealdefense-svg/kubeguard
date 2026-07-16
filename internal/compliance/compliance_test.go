@@ -33,8 +33,8 @@ func TestLoadEmbeddedPacks(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadEmbedded: %v", err)
 	}
-	if len(packs) != 11 {
-		t.Fatalf("got %d packs, want 11", len(packs))
+	if len(packs) != 12 {
+		t.Fatalf("got %d packs, want 12", len(packs))
 	}
 	for _, p := range packs {
 		if p.Disclaimer == "" {
